@@ -14,6 +14,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const NOT_RECIPE_ERROR = 'That does not look like a recipe. Paste ingredients and cooking steps, then try again.';
+
 type FormattedRecipe = {
   title: string;
   ingredients: string[];
@@ -23,6 +25,12 @@ type FormattedRecipe = {
   source: string;
   sourceText: string;
 };
+
+class RecipeValidationError extends Error {
+  constructor() {
+    super(NOT_RECIPE_ERROR);
+  }
+}
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -121,6 +129,10 @@ function normalizeIngredients(ingredients: string[]) {
   }).map(cleanIngredientText).filter(Boolean);
 }
 
+function countIngredientItems(ingredients: string[]) {
+  return ingredients.filter((ingredient) => !/^[^:]{2,45}:$/.test(ingredient.trim())).length;
+}
+
 function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -130,6 +142,7 @@ function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | n
 
   if (
     typeof recipe.title !== 'string' ||
+    !recipe.title.trim() ||
     typeof recipe.cookTime !== 'string' ||
     typeof recipe.servings !== 'string' ||
     typeof recipe.source !== 'string' ||
@@ -139,10 +152,17 @@ function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | n
     return null;
   }
 
+  const ingredients = normalizeIngredients(recipe.ingredients);
+  const steps = recipe.steps.map((step) => step.trim()).filter(Boolean);
+
+  if (countIngredientItems(ingredients) < 2 || steps.length < 2) {
+    return null;
+  }
+
   return {
     title: recipe.title,
-    ingredients: normalizeIngredients(recipe.ingredients),
-    steps: recipe.steps,
+    ingredients,
+    steps,
     cookTime: recipe.cookTime,
     servings: recipe.servings,
     source: recipe.source,
@@ -172,7 +192,13 @@ function getGeminiText(value: unknown) {
 function getPrompt(text: string) {
   return [
     'Format the pasted recipe text into strict JSON only.',
-    'Return exactly these fields: title, ingredients, steps, cookTime, servings, source.',
+    'First decide if the pasted text is a real recipe.',
+    'If the input is not a real recipe or does not contain enough cooking information, return exactly this JSON shape:',
+    '{"isRecipe":false,"reason":"This does not look like a recipe."}',
+    'Only return isRecipe true when the input contains enough information to create ingredients and steps.',
+    'For valid recipes, return exactly this JSON shape:',
+    '{"isRecipe":true,"recipe":{"title":"","cookTime":"","servings":"","source":"","ingredients":[],"steps":[],"sourceText":""}}',
+    'Set recipe.sourceText to the original pasted recipe text.',
     'Use arrays of strings for ingredients and steps.',
     'Return each ingredient as its own array item.',
     'Never combine multiple ingredients into one string.',
@@ -249,20 +275,29 @@ async function formatWithGemini(text: string) {
         responseSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string' },
-            ingredients: {
-              type: 'array',
-              items: { type: 'string' },
+            isRecipe: { type: 'boolean' },
+            reason: { type: 'string' },
+            recipe: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                cookTime: { type: 'string' },
+                servings: { type: 'string' },
+                source: { type: 'string' },
+                ingredients: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+                steps: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+                sourceText: { type: 'string' },
+              },
+              required: ['title', 'cookTime', 'servings', 'source', 'ingredients', 'steps', 'sourceText'],
             },
-            steps: {
-              type: 'array',
-              items: { type: 'string' },
-            },
-            cookTime: { type: 'string' },
-            servings: { type: 'string' },
-            source: { type: 'string' },
           },
-          required: ['title', 'ingredients', 'steps', 'cookTime', 'servings', 'source'],
+          required: ['isRecipe'],
         },
       },
     }),
@@ -290,18 +325,28 @@ async function formatWithGemini(text: string) {
     throw new Error('Gemini did not return recipe JSON.');
   }
 
-  let recipe: unknown;
+  let formatterResult: unknown;
 
   try {
-    recipe = JSON.parse(recipeJson);
+    formatterResult = JSON.parse(recipeJson);
   } catch {
     throw new Error('Gemini returned bad recipe JSON.');
   }
 
-  const formattedRecipe = validateRecipe(recipe, text);
+  if (!formatterResult || typeof formatterResult !== 'object') {
+    throw new RecipeValidationError();
+  }
+
+  const result = formatterResult as Record<string, unknown>;
+
+  if (result.isRecipe !== true || !result.recipe) {
+    throw new RecipeValidationError();
+  }
+
+  const formattedRecipe = validateRecipe(result.recipe, text);
 
   if (!formattedRecipe) {
-    throw new Error('Gemini returned an invalid recipe.');
+    throw new RecipeValidationError();
   }
 
   return formattedRecipe;
@@ -339,6 +384,8 @@ Deno.serve(async (request) => {
     return jsonResponse({ recipe });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not format recipe with Gemini.';
-    return jsonResponse({ error: message }, 500);
+    const status = error instanceof RecipeValidationError ? 400 : 500;
+
+    return jsonResponse({ error: message }, status);
   }
 });

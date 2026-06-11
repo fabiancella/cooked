@@ -36,6 +36,9 @@ function AppContent() {
         <Stack.Screen name="preview" options={{ presentation: 'card' }} />
         <Stack.Screen name="recipe/[id]" />
         <Stack.Screen name="cooking/[id]" />
+        <Stack.Screen name="settings/account" />
+        <Stack.Screen name="settings/help" />
+        <Stack.Screen name="settings/about" />
       </Stack>
     </RecipeProvider>
   );

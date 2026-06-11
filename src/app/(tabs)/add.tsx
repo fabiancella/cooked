@@ -21,6 +21,29 @@ type FunctionErrorBody = {
   error?: unknown;
 };
 
+const EMPTY_RECIPE_TEXT_ERROR = 'Paste recipe text before formatting.';
+const FORMAT_FAILED_ERROR = 'Could not format this recipe. Check the text and try again.';
+const INVALID_RECIPE_ERROR = 'The formatter returned recipe data we could not read. Try formatting again.';
+const NOT_RECIPE_ERROR = 'That does not look like a recipe. Paste ingredients and cooking steps, then try again.';
+
+function getReadableFunctionError(message: string) {
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes('does not look like a recipe')) {
+    return NOT_RECIPE_ERROR;
+  }
+
+  if (lowerMessage.includes('invalid recipe') || lowerMessage.includes('bad recipe json')) {
+    return INVALID_RECIPE_ERROR;
+  }
+
+  if (lowerMessage.includes('gemini') || lowerMessage.includes('edge function') || lowerMessage.includes('non-2xx')) {
+    return FORMAT_FAILED_ERROR;
+  }
+
+  return message;
+}
+
 async function getFunctionErrorMessage(error: unknown) {
   const fallback = error instanceof Error && error.message ? error.message : 'Could not format this recipe. Try again.';
   const context = error && typeof error === 'object' && 'context' in error ? (error as { context?: unknown }).context : null;
@@ -33,13 +56,13 @@ async function getFunctionErrorMessage(error: unknown) {
     const body = (await context.clone().json()) as FunctionErrorBody;
 
     if (typeof body.error === 'string' && body.error.trim()) {
-      return body.error;
+      return getReadableFunctionError(body.error);
     }
   } catch {
-    return fallback;
+    return getReadableFunctionError(fallback);
   }
 
-  return fallback;
+  return getReadableFunctionError(fallback);
 }
 
 function getRecipeColor(source?: string) {
@@ -99,7 +122,7 @@ export default function AddRecipeScreen() {
     const trimmedText = text.trim();
 
     if (!trimmedText) {
-      setFormatError('Paste recipe text before formatting.');
+      setFormatError(EMPTY_RECIPE_TEXT_ERROR);
       return;
     }
 
@@ -120,7 +143,7 @@ export default function AddRecipeScreen() {
     const formattedRecipe = getFormattedRecipe(data, trimmedText);
 
     if (!formattedRecipe) {
-      setFormatError('The formatter returned an invalid recipe. Try again.');
+      setFormatError(INVALID_RECIPE_ERROR);
       return;
     }
 
@@ -163,7 +186,18 @@ export default function AddRecipeScreen() {
         />
       </View>
 
-      {formatError ? <Text style={styles.errorText}>{formatError}</Text> : null}
+      {formatError ? (
+        <View style={styles.errorPanel}>
+          <Text style={styles.errorText}>{formatError}</Text>
+          <AppButton
+            disabled={isFormatting || !text.trim()}
+            variant="secondary"
+            onPress={formatRecipe}
+            icon={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }}>
+            Retry
+          </AppButton>
+        </View>
+      ) : null}
 
       <AppButton
         disabled={isFormatting || !text.trim()}
@@ -224,6 +258,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '600',
+  },
+  errorPanel: {
+    gap: 10,
   },
   errorText: {
     color: palette.tomato,
