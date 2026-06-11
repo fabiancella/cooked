@@ -2,14 +2,18 @@ import { SymbolView } from 'expo-symbols';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { useAuth } from '@/context/auth-store';
 
 const rows = ['Account', 'Export recipes', 'Subscription', 'Help', 'About'];
 
 export default function SettingsScreen() {
+  const { action, error, signOut, user } = useAuth();
+  const isSigningOut = action === 'signing-out';
+
   return (
     <Screen>
-      <Header eyebrow="Settings" title="Preferences" subtitle="Placeholder settings for the clickable prototype." />
+      <Header eyebrow="Settings" title="Preferences" subtitle={user?.email ?? 'Signed in'} />
       <View style={styles.panel}>
         {rows.map((row) => (
           <View key={row} style={styles.row}>
@@ -18,6 +22,10 @@ export default function SettingsScreen() {
           </View>
         ))}
       </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <AppButton disabled={isSigningOut} variant="danger" onPress={signOut}>
+        {isSigningOut ? 'Logging out...' : 'Log Out'}
+      </AppButton>
     </Screen>
   );
 }
@@ -43,5 +51,11 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontSize: 17,
     fontWeight: '800',
+  },
+  errorText: {
+    color: palette.tomato,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
 });

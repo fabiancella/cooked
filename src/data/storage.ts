@@ -1,106 +1,134 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import { Recipe } from '@/data/mock-recipes';
+import { supabase } from '@/lib/supabase';
 
-export const STORAGE_KEY = '@cooked:recipes';
+type RecipeRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  cook_time: string;
+  servings: string;
+  source: string;
+  ingredients: string[];
+  steps: string[];
+  source_text: string | null;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
-function isRecipe(value: unknown): value is Recipe {
-  if (!value || typeof value !== 'object') {
-    return false;
+function getRecipeColor(source: string) {
+  if (source === 'TikTok') {
+    return '#F18F7A';
   }
 
-  const recipe = value as Partial<Recipe>;
-
-  return (
-    typeof recipe.id === 'string' &&
-    typeof recipe.title === 'string' &&
-    typeof recipe.cookTime === 'string' &&
-    typeof recipe.servings === 'string' &&
-    typeof recipe.source === 'string' &&
-    typeof recipe.color === 'string' &&
-    Array.isArray(recipe.ingredients) &&
-    Array.isArray(recipe.steps)
-  );
-}
-
-async function readRecipeList() {
-  try {
-    const storedValue = await AsyncStorage.getItem(STORAGE_KEY);
-
-    // Nothing has been saved yet, so callers can decide whether to show mock data.
-    if (!storedValue) {
-      return null;
-    }
-
-    const parsedValue: unknown = JSON.parse(storedValue);
-
-    // AsyncStorage only stores strings, so we validate the parsed JSON before trusting it.
-    if (!Array.isArray(parsedValue) || !parsedValue.every(isRecipe)) {
-      return null;
-    }
-
-    return parsedValue;
-  } catch (error) {
-    console.error('Error loading recipes from storage:', error);
-    return null;
+  if (source === 'Instagram') {
+    return '#F6C453';
   }
-}
 
-export async function loadRecipes(fallbackRecipes: Recipe[] = []) {
-  const storedRecipes = await readRecipeList();
-
-  // If storage is empty or invalid, return the provided fallback list.
-  return storedRecipes ?? fallbackRecipes;
-}
-
-export async function saveRecipes(recipes: Recipe[]) {
-  try {
-    const jsonValue = JSON.stringify(recipes);
-    await AsyncStorage.setItem(STORAGE_KEY, jsonValue);
-    return recipes;
-  } catch (error) {
-    console.error('Error saving recipes to storage:', error);
-    return recipes;
+  if (source === 'Screenshot') {
+    return '#C86738';
   }
+
+  return '#E7A458';
 }
 
-export async function getRecipe(id: string) {
-  const recipes = await loadRecipes();
-  return recipes.find((recipe) => recipe.id === id);
+function toRecipe(row: RecipeRow): Recipe {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    cookTime: row.cook_time,
+    servings: row.servings,
+    source: row.source,
+    sourceText: row.source_text,
+    imageUrl: row.image_url,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    color: getRecipeColor(row.source),
+    ingredients: row.ingredients,
+    steps: row.steps,
+  };
 }
 
-export async function addRecipe(recipe: Recipe) {
-  const recipes = await loadRecipes();
-  const nextRecipes = [recipe, ...recipes];
-
-  // Save the full list back because AsyncStorage does not update array items by itself.
-  await saveRecipes(nextRecipes);
-  return recipe;
+function toRecipePayload(recipe: Recipe) {
+  return {
+    title: recipe.title,
+    cook_time: recipe.cookTime,
+    servings: recipe.servings,
+    source: recipe.source,
+    ingredients: recipe.ingredients,
+    steps: recipe.steps,
+    source_text: recipe.sourceText ?? null,
+    image_url: recipe.imageUrl ?? null,
+  };
 }
 
-export async function updateRecipe(id: string, recipe: Recipe) {
-  const recipes = await loadRecipes();
-  const updatedRecipe = { ...recipe, id };
-  const nextRecipes = recipes.map((currentRecipe) =>
-    currentRecipe.id === id ? updatedRecipe : currentRecipe,
-  );
-
-  await saveRecipes(nextRecipes);
-  return updatedRecipe;
+function throwSupabaseError(error: { message: string; code?: string; details?: string; hint?: string }) {
+  const detailParts = [error.message, error.details, error.hint, error.code].filter(Boolean);
+  throw new Error(detailParts.join(' '));
 }
 
-export async function deleteRecipe(id: string) {
-  const recipes = await loadRecipes();
-  const nextRecipes = recipes.filter((recipe) => recipe.id !== id);
+export async function loadRecipes(userId: string) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
 
-  await saveRecipes(nextRecipes);
-  return nextRecipes;
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  return (data as RecipeRow[]).map(toRecipe);
 }
 
-export async function clearRecipes() {
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.error('Error clearing recipes from storage:', error);
+export async function getRecipe(id: string, userId: string) {
+  const { data, error } = await supabase.from('recipes').select('*').eq('id', id).eq('user_id', userId).single();
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  return toRecipe(data as RecipeRow);
+}
+
+export async function addRecipe(recipe: Recipe, userId: string) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .insert({
+      ...toRecipePayload(recipe),
+      user_id: userId,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  return toRecipe(data as RecipeRow);
+}
+
+export async function updateRecipe(id: string, recipe: Recipe, userId: string) {
+  const { data, error } = await supabase
+    .from('recipes')
+    .update(toRecipePayload(recipe))
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  return toRecipe(data as RecipeRow);
+}
+
+export async function deleteRecipe(id: string, userId: string) {
+  const { error } = await supabase.from('recipes').delete().eq('id', id).eq('user_id', userId);
+
+  if (error) {
+    throwSupabaseError(error);
   }
 }

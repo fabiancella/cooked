@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
@@ -7,12 +7,18 @@ import { useRecipes } from '@/context/recipe-store';
 
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { deleteRecipe, getRecipe } = useRecipes();
+  const { deleteRecipe, error, getRecipe, loading } = useRecipes();
   const recipe = getRecipe(id);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const deleteCurrentRecipe = () => {
-    deleteRecipe(id);
-    router.replace('/');
+  const deleteCurrentRecipe = async () => {
+    setIsDeleting(true);
+    const wasDeleted = await deleteRecipe(id);
+    setIsDeleting(false);
+
+    if (wasDeleted) {
+      router.replace('/');
+    }
   };
 
   const confirmDelete = () => {
@@ -21,16 +27,24 @@ export default function RecipeDetailScreen() {
       return;
     }
 
-    Alert.alert('Delete recipe?', 'This only removes it from mock local data.', [
+    Alert.alert('Delete recipe?', 'This will remove it from your saved recipes.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: deleteCurrentRecipe },
     ]);
   };
 
+  if (loading) {
+    return (
+      <Screen>
+        <Header title="Loading recipe" subtitle="Fetching this recipe from Supabase." />
+      </Screen>
+    );
+  }
+
   if (!recipe) {
     return (
       <Screen>
-        <Header title="Recipe not found" subtitle="This mock recipe is not available in local state." />
+        <Header title="Recipe not found" subtitle="This recipe is not available for the current user." />
         <AppButton onPress={() => router.replace('/')}>Back to Recipes</AppButton>
       </Screen>
     );
@@ -59,6 +73,7 @@ export default function RecipeDetailScreen() {
       </View>
 
       <View style={styles.actions}>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <AppButton onPress={() => router.push({ pathname: '/cooking/[id]', params: { id: recipe.id } })} icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}>
           Start Cooking
         </AppButton>
@@ -68,8 +83,8 @@ export default function RecipeDetailScreen() {
           icon={{ ios: 'pencil', android: 'edit', web: 'edit' }}>
           Edit
         </AppButton>
-        <AppButton variant="danger" onPress={confirmDelete} icon={{ ios: 'trash', android: 'delete', web: 'delete' }}>
-          Delete
+        <AppButton disabled={isDeleting} variant="danger" onPress={confirmDelete} icon={{ ios: 'trash', android: 'delete', web: 'delete' }}>
+          {isDeleting ? 'Deleting...' : 'Delete'}
         </AppButton>
       </View>
     </Screen>
@@ -121,5 +136,11 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  errorText: {
+    color: palette.tomato,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
 });

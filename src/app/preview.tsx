@@ -154,10 +154,11 @@ function WheelPickerField({
 
 export default function PreviewRecipeScreen() {
   const { id, recipe } = useLocalSearchParams<{ id?: string; recipe?: string }>();
-  const { addRecipe, getRecipe, updateRecipe } = useRecipes();
+  const { addRecipe, error, getRecipe, updateRecipe } = useRecipes();
   const existingRecipe = id ? getRecipe(id) : undefined;
   const formattedRecipe = useMemo(() => parseRecipeParam(recipe), [recipe]);
   const initialRecipe = existingRecipe ?? formattedRecipe ?? formattedMockRecipe;
+  const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState(initialRecipe.title);
   const [cookTime, setCookTime] = useState(initialRecipe.cookTime);
   const [servings, setServings] = useState(initialRecipe.servings);
@@ -182,15 +183,16 @@ export default function PreviewRecipeScreen() {
     [cookTime, ingredientsText, initialRecipe, servings, stepsText, title],
   );
 
-  const saveRecipe = () => {
-    const recipe = id ? updateRecipe(id, editedRecipe) : addRecipe(editedRecipe);
+  const saveRecipe = async () => {
+    setIsSaving(true);
+    const savedRecipe = id ? await updateRecipe(id, editedRecipe) : await addRecipe(editedRecipe);
+    setIsSaving(false);
 
-    if (!recipe) {
-      router.replace('/');
+    if (!savedRecipe) {
       return;
     }
 
-    router.replace({ pathname: '/recipe/[id]', params: { id: recipe.id } });
+    router.replace({ pathname: '/recipe/[id]', params: { id: savedRecipe.id } });
   };
 
   return (
@@ -239,8 +241,9 @@ export default function PreviewRecipeScreen() {
       </EditableField>
 
       <View style={styles.actions}>
-        <AppButton onPress={saveRecipe} icon={{ ios: 'checkmark', android: 'check', web: 'check' }}>
-          {id ? 'Update Recipe' : 'Save Recipe'}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <AppButton disabled={isSaving} onPress={saveRecipe} icon={{ ios: 'checkmark', android: 'check', web: 'check' }}>
+          {isSaving ? (id ? 'Updating...' : 'Saving...') : id ? 'Update Recipe' : 'Save Recipe'}
         </AppButton>
         <AppButton variant="danger" onPress={() => router.back()}>
           Cancel
@@ -267,6 +270,12 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  errorText: {
+    color: palette.tomato,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   pickerField: {
     flex: 1,

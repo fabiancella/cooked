@@ -203,6 +203,8 @@ export function formatRecipeText(text: string): Recipe {
     cookTime: getCookTime(text),
     servings: getServings(text),
     source,
+    sourceText: text,
+    imageUrl: null,
     color: source === 'TikTok' ? '#F18F7A' : source === 'Instagram' ? '#F6C453' : '#E7A458',
     ingredients: ingredients.length > 0 ? ingredients : ['Ingredients TBD from pasted text'],
     steps: steps.length > 0 ? steps : ['Steps TBD from pasted text'],

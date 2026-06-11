@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
-import { formatRecipeText } from '@/data/mock-formatter';
+import { Recipe } from '@/data/mock-recipes';
+import { supabase } from '@/lib/supabase';
 
 const options = [
   { title: 'Paste recipe text', icon: { ios: 'doc.plaintext', android: 'article', web: 'article' } },
@@ -12,11 +13,91 @@ const options = [
   { title: 'Upload screenshot', icon: { ios: 'photo.on.rectangle', android: 'image', web: 'image' } },
 ] as const;
 
+type FormattedRecipeResponse = {
+  recipe?: Partial<Recipe>;
+};
+
+function getRecipeColor(source?: string) {
+  if (source === 'TikTok') {
+    return '#F18F7A';
+  }
+
+  if (source === 'Instagram') {
+    return '#F6C453';
+  }
+
+  if (source === 'Screenshot') {
+    return '#C86738';
+  }
+
+  return '#E7A458';
+}
+
+function getFormattedRecipe(data: FormattedRecipeResponse | null, fallbackText: string): Recipe | null {
+  const recipe = data?.recipe;
+
+  if (!recipe) {
+    return null;
+  }
+
+  if (
+    typeof recipe.title !== 'string' ||
+    typeof recipe.cookTime !== 'string' ||
+    typeof recipe.servings !== 'string' ||
+    typeof recipe.source !== 'string' ||
+    !Array.isArray(recipe.ingredients) ||
+    !Array.isArray(recipe.steps)
+  ) {
+    return null;
+  }
+
+  return {
+    id: 'formatted-preview',
+    title: recipe.title,
+    cookTime: recipe.cookTime,
+    servings: recipe.servings,
+    source: recipe.source,
+    sourceText: typeof recipe.sourceText === 'string' ? recipe.sourceText : fallbackText,
+    imageUrl: null,
+    color: getRecipeColor(recipe.source),
+    ingredients: recipe.ingredients.filter((ingredient): ingredient is string => typeof ingredient === 'string'),
+    steps: recipe.steps.filter((step): step is string => typeof step === 'string'),
+  };
+}
+
 export default function AddRecipeScreen() {
   const [text, setText] = useState('');
+  const [isFormatting, setIsFormatting] = useState(false);
+  const [formatError, setFormatError] = useState<string | null>(null);
 
-  const formatRecipe = () => {
-    const formattedRecipe = formatRecipeText(text);
+  const formatRecipe = async () => {
+    const trimmedText = text.trim();
+
+    if (!trimmedText) {
+      setFormatError('Paste recipe text before formatting.');
+      return;
+    }
+
+    setIsFormatting(true);
+    setFormatError(null);
+
+    const { data, error } = await supabase.functions.invoke<FormattedRecipeResponse>('format-recipe', {
+      body: { text: trimmedText },
+    });
+
+    setIsFormatting(false);
+
+    if (error) {
+      setFormatError(error.message || 'Could not format this recipe. Try again.');
+      return;
+    }
+
+    const formattedRecipe = getFormattedRecipe(data, trimmedText);
+
+    if (!formattedRecipe) {
+      setFormatError('The formatter returned an invalid recipe. Try again.');
+      return;
+    }
 
     router.push({
       pathname: '/preview',
@@ -45,7 +126,10 @@ export default function AddRecipeScreen() {
         <Text style={styles.inputLabel}>Recipe text, caption, or notes</Text>
         <TextInput
           value={text}
-          onChangeText={setText}
+          onChangeText={(value) => {
+            setText(value);
+            setFormatError(null);
+          }}
           multiline
           textAlignVertical="top"
           placeholder="Example: saw this pasta on IG... boil rigatoni, lemon, parm, butter, pasta water..."
@@ -54,8 +138,13 @@ export default function AddRecipeScreen() {
         />
       </View>
 
-      <AppButton onPress={formatRecipe} icon={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }}>
-        Format Recipe
+      {formatError ? <Text style={styles.errorText}>{formatError}</Text> : null}
+
+      <AppButton
+        disabled={isFormatting || !text.trim()}
+        onPress={formatRecipe}
+        icon={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }}>
+        {isFormatting ? 'Formatting...' : 'Format Recipe'}
       </AppButton>
     </Screen>
   );
@@ -110,5 +199,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '600',
+  },
+  errorText: {
+    color: palette.tomato,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
 });

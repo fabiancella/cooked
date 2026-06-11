@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AppButton, Header, palette, RecipeCard, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
 export default function HomeScreen() {
-  const { recipes } = useRecipes();
+  const { error, loading, recipes, refreshRecipes } = useRecipes();
   const [query, setQuery] = useState('');
 
   const filteredRecipes = useMemo(
@@ -30,7 +30,22 @@ export default function HomeScreen() {
         />
       </View>
 
-      {filteredRecipes.length > 0 ? (
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={palette.herb} />
+          <Text style={styles.emptyTitle}>Loading recipes</Text>
+          <Text style={styles.emptyText}>Fetching your saved recipes from Supabase.</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <SymbolView name={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }} size={34} tintColor={palette.tomato} />
+          </View>
+          <Text style={styles.emptyTitle}>Could not load recipes</Text>
+          <Text style={styles.emptyText}>{error}</Text>
+          <AppButton onPress={refreshRecipes}>Retry Loading</AppButton>
+        </View>
+      ) : filteredRecipes.length > 0 ? (
         <View style={styles.list}>
           {filteredRecipes.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: recipe.id } })} />
