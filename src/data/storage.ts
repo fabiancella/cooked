@@ -22,7 +22,7 @@ function getRecipeColor(source: string) {
   }
 
   if (source === 'Instagram') {
-    return '#F6C453';
+    return '#0a18e9';
   }
 
   if (source === 'Screenshot') {

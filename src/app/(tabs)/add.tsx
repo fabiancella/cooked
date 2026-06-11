@@ -17,6 +17,31 @@ type FormattedRecipeResponse = {
   recipe?: Partial<Recipe>;
 };
 
+type FunctionErrorBody = {
+  error?: unknown;
+};
+
+async function getFunctionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error && error.message ? error.message : 'Could not format this recipe. Try again.';
+  const context = error && typeof error === 'object' && 'context' in error ? (error as { context?: unknown }).context : null;
+
+  if (!(context instanceof Response)) {
+    return fallback;
+  }
+
+  try {
+    const body = (await context.clone().json()) as FunctionErrorBody;
+
+    if (typeof body.error === 'string' && body.error.trim()) {
+      return body.error;
+    }
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
+}
+
 function getRecipeColor(source?: string) {
   if (source === 'TikTok') {
     return '#F18F7A';
@@ -88,7 +113,7 @@ export default function AddRecipeScreen() {
     setIsFormatting(false);
 
     if (error) {
-      setFormatError(error.message || 'Could not format this recipe. Try again.');
+      setFormatError(await getFunctionErrorMessage(error));
       return;
     }
 

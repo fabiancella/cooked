@@ -5,6 +5,10 @@ import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { AppButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
+function isIngredientHeading(ingredient: string) {
+  return /^[^:]{2,45}:$/.test(ingredient.trim());
+}
+
 export default function RecipeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { deleteRecipe, error, getRecipe, loading } = useRecipes();
@@ -57,9 +61,13 @@ export default function RecipeDetailScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ingredients</Text>
-        {recipe.ingredients.map((ingredient, index) => (
-          <Text key={`${ingredient}-${index}`} style={styles.bodyText}>• {ingredient}</Text>
-        ))}
+        {recipe.ingredients.map((ingredient, index) => {
+          if (isIngredientHeading(ingredient)) {
+            return <Text key={`${ingredient}-${index}`} style={styles.ingredientHeading}>{ingredient}</Text>;
+          }
+
+          return <Text key={`${ingredient}-${index}`} style={styles.bodyText}>• {ingredient}</Text>;
+        })}
       </View>
 
       <View style={styles.section}>
@@ -110,6 +118,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 26,
     fontWeight: '600',
+  },
+  ingredientHeading: {
+    color: palette.ink,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '900',
+    marginTop: 6,
   },
   stepRow: {
     flexDirection: 'row',
