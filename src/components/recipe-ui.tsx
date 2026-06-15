@@ -30,7 +30,7 @@ type ScreenProps = PropsWithChildren<{
   contentStyle?: ViewProps['style'];
 }>;
 
-export function Screen({ children, scroll = true, contentStyle   }: ScreenProps) {
+export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
   if (!scroll) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -147,12 +147,12 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     alignSelf: 'center',
     paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 20,
     paddingBottom: 110,
-    gap: 18,
+    gap: 20,
   },
   header: {
-    gap: 6,
+    gap: 7,
   },
   eyebrow: {
     color: palette.tomato,
@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: palette.ink,
-    fontSize: 34,
-    lineHeight: 39,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: '800',
   },
   subtitle: {
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   button: {
     minHeight: 52,
-    borderRadius: 18,
+    borderRadius: 14,
     paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
@@ -216,14 +216,14 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.paper,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
     overflow: 'hidden',
     shadowColor: '#3B2513',
     shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 2,
   },
   imageBlock: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   fieldBox: {
     backgroundColor: palette.paper,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: palette.line,
     padding: 16,
@@ -293,8 +293,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroImage: {
-    height: 180,
-    borderRadius: 28,
+    height: 170,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

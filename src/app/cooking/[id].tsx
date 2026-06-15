@@ -34,7 +34,7 @@ export default function CookingModeScreen() {
   };
 
   return (
-    <Screen scroll={false} contentStyle={styles.content}>
+    <Screen contentStyle={styles.content}>
       <Header eyebrow="Cooking mode" title={recipe.title} subtitle={`Step ${stepIndex + 1} of ${recipe.steps.length}`} />
 
       <View style={styles.progressTrack}>
@@ -55,13 +55,14 @@ export default function CookingModeScreen() {
         <AppButton
           variant="secondary"
           disabled={stepIndex === 0}
+          style={styles.controlButton}
           onPress={() => setStepIndex((current) => Math.max(current - 1, 0))}>
           Back
         </AppButton>
         {stepIndex === recipe.steps.length - 1 ? (
-          <AppButton onPress={() => router.back()}>Done</AppButton>
+          <AppButton style={styles.controlButton} onPress={() => router.back()}>Done</AppButton>
         ) : (
-          <AppButton onPress={() => setStepIndex((current) => Math.min(current + 1, recipe.steps.length - 1))}>
+          <AppButton style={styles.controlButton} onPress={() => setStepIndex((current) => Math.min(current + 1, recipe.steps.length - 1))}>
             Next
           </AppButton>
         )}
@@ -72,7 +73,7 @@ export default function CookingModeScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    justifyContent: 'space-between',
+    gap: 20,
   },
   progressTrack: {
     height: 10,
@@ -86,15 +87,14 @@ const styles = StyleSheet.create({
     backgroundColor: palette.tomato,
   },
   stepCard: {
-    flex: 1,
-    minHeight: 300,
+    minHeight: 360,
     backgroundColor: palette.paper,
-    borderRadius: 32,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
-    padding: 26,
-    justifyContent: 'center',
-    gap: 18,
+    padding: 22,
+    justifyContent: 'flex-start',
+    gap: 16,
   },
   stepLabel: {
     color: palette.tomato,
@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
   },
   stepText: {
     color: palette.ink,
-    fontSize: 30,
-    lineHeight: 40,
+    fontSize: 24,
+    lineHeight: 34,
     fontWeight: '800',
   },
   checkButton: {
     minHeight: 50,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#D4E1D0',
     backgroundColor: palette.sage,
@@ -136,5 +136,8 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     gap: 12,
+  },
+  controlButton: {
+    flex: 1,
   },
 });

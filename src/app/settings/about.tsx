@@ -14,7 +14,7 @@ export default function AboutScreen() {
         <Text style={styles.description}>
           Cooked helps you turn pasted recipe text and social captions into clean, editable recipes.
         </Text>
-        <Text style={styles.version}>Version TBD</Text>
+        <Text style={styles.version}>Version 0.1.0</Text>
       </View>
 
       <AppButton variant="secondary" onPress={() => router.back()}>
@@ -27,7 +27,7 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
     padding: 18,

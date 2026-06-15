@@ -1,8 +1,6 @@
 # Cooked
 
-Cooked is an Expo React Native app for saving recipes from messy text, social captions, links, and future screenshots. The app currently uses a local mock formatter to turn pasted recipe text into clean recipe cards, then saves those recipes to Supabase for the logged-in user.
-
-No AI provider is connected yet.
+Cooked is an Expo React Native app for saving recipes from messy text, social captions, and notes. The app uses a Supabase Edge Function with Gemini to turn pasted recipe text into clean recipe cards, then saves those recipes to Supabase for the logged-in user.
 
 ## Features
 
@@ -10,13 +8,14 @@ No AI provider is connected yet.
 - Saved recipes loaded from Supabase Postgres
 - User-owned recipe CRUD with Row Level Security
 - Searchable recipe list
-- Add Recipe flow for pasted recipe text or social captions/links
-- Mock recipe formatter
+- Add Recipe flow for pasted recipe text, notes, or captions
+- Gemini recipe formatter through a Supabase Edge Function
+- Non-recipe input validation with readable errors and retry
 - Preview/edit before saving
 - Recipe detail page
 - Cooking mode with step-by-step instructions
 - Cook time and servings picker in Preview
-- Placeholder Settings screen
+- Basic Settings, Account, Help, and About screens
 
 ## Tech Stack
 
@@ -38,6 +37,7 @@ src/
       index.tsx          Recipes tab
       add.tsx            Add Recipe tab
       settings.tsx       Settings and logout
+      settings/          Account, Help, and About screens
     preview.tsx          Preview/edit recipe before saving
     recipe/[id].tsx      Recipe detail
     cooking/[id].tsx     Cooking mode
@@ -48,12 +48,14 @@ src/
     auth-store.tsx       Supabase Auth state and actions
     recipe-store.tsx     Recipe state backed by Supabase CRUD
   data/
-    mock-formatter.ts    Local mock formatter, replaceable by AI later
-    mock-recipes.ts      Recipe type and fallback/mock objects
+    mock-formatter.ts    Legacy local formatter kept for reference
+    mock-recipes.ts      Recipe type and fallback objects
     storage.ts           Supabase recipe table CRUD helpers
   lib/
     supabase.ts          Supabase client setup
 supabase/
+  functions/
+    format-recipe/       Gemini formatter Edge Function
   schema.sql             Recipes table, indexes/triggers, and RLS policies
 ```
 
@@ -64,6 +66,12 @@ Create a local `.env` file in the app root:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=your-supabase-project-url
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+Set this secret for the Supabase Edge Function:
+
+```sh
+supabase secrets set GEMINI_API_KEY=your-gemini-api-key
 ```
 
 The real `.env` file is ignored by git. Do not commit Supabase keys or service role keys.
@@ -112,27 +120,30 @@ npm run ios
 npm run android
 npm run web
 npx tsc --noEmit
+deno check supabase/functions/format-recipe/index.ts
+supabase functions deploy format-recipe
 ```
 
 ## Current Recipe Flow
 
 1. User signs up or logs in with Supabase Auth.
 2. User pastes messy recipe text on the Add Recipe screen.
-3. `src/data/mock-formatter.ts` converts the text into a `Recipe` object.
-4. Preview lets the user edit title, cook time, servings, ingredients, and steps.
-5. Save calls `recipe-store`.
-6. `recipe-store` calls `src/data/storage.ts`.
-7. `storage.ts` inserts or updates rows in Supabase.
-8. Home loads recipes from Supabase for the logged-in user.
+3. The app calls the `format-recipe` Supabase Edge Function.
+4. Gemini validates that the pasted text looks like a recipe and returns structured JSON.
+5. Preview lets the user edit title, cook time, servings, ingredients, and steps.
+6. Save calls `recipe-store`.
+7. `recipe-store` calls `src/data/storage.ts`.
+8. `storage.ts` inserts or updates rows in Supabase.
+9. Home loads recipes from Supabase for the logged-in user.
 
 ## Not Built Yet
 
-- Real AI formatting
 - Screenshot upload
 - Image storage
+- Export recipes
 - Payments or subscriptions
+- Account deletion
 - App Store setup
-- Production recipe parsing
 
 ## Security Notes
 

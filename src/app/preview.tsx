@@ -200,7 +200,7 @@ export default function PreviewRecipeScreen() {
       <Header
         eyebrow={id ? 'Edit recipe' : 'Preview'}
         title={id ? 'Update recipe' : 'Formatted recipe'}
-        subtitle="Adjust the mock formatted fields before saving."
+        subtitle="Review the formatted fields before saving."
       />
       <PlaceholderImage color={initialRecipe.color} />
 
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   multiInput: {
-    minHeight: 120,
+    minHeight: 140,
   },
   actions: {
     gap: 10,
@@ -304,8 +304,8 @@ const styles = StyleSheet.create({
   },
   pickerSheet: {
     backgroundColor: palette.paper,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 34,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     minHeight: 40,
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: palette.sage,
     justifyContent: 'center',
     paddingHorizontal: 14,

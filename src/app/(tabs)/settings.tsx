@@ -63,7 +63,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
     overflow: 'hidden',

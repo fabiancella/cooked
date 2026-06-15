@@ -17,7 +17,7 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <Header eyebrow="Cooked" title="Your saved recipes" subtitle="Clean recipe cards from links, captions, screenshots, and notes." />
+      <Header eyebrow="Cooked" title="Your saved recipes" subtitle="Clean recipe cards from pasted text, captions, and notes." />
 
       <View style={styles.searchBox}>
         <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor={palette.muted} />
@@ -34,7 +34,7 @@ export default function HomeScreen() {
         <View style={styles.emptyState}>
           <ActivityIndicator color={palette.herb} />
           <Text style={styles.emptyTitle}>Loading recipes</Text>
-          <Text style={styles.emptyText}>Fetching your saved recipes from Supabase.</Text>
+          <Text style={styles.emptyText}>Fetching your saved recipes.</Text>
         </View>
       ) : error ? (
         <View style={styles.emptyState}>
@@ -57,7 +57,7 @@ export default function HomeScreen() {
             <SymbolView name={{ ios: 'doc.text.magnifyingglass', android: 'description', web: 'description' }} size={34} tintColor={palette.herb} />
           </View>
           <Text style={styles.emptyTitle}>No recipes found</Text>
-          <Text style={styles.emptyText}>Paste a caption, link, or screenshot and Cooked will turn it into a tidy recipe card.</Text>
+          <Text style={styles.emptyText}>Paste recipe text or notes and Cooked will turn them into a tidy recipe card.</Text>
           <AppButton onPress={() => router.push('/add')} icon={{ ios: 'plus', android: 'add', web: 'add' }}>
             Add Recipe
           </AppButton>
@@ -70,7 +70,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   searchBox: {
     minHeight: 54,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: palette.paper,
     borderWidth: 1,
     borderColor: palette.line,
@@ -90,24 +90,25 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     backgroundColor: palette.paper,
-    borderRadius: 28,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
-    padding: 24,
+    padding: 22,
     alignItems: 'center',
     gap: 14,
   },
   emptyIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: palette.sage,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyTitle: {
     color: palette.ink,
-    fontSize: 22,
+    fontSize: 21,
+    lineHeight: 27,
     fontWeight: '800',
   },
   emptyText: {

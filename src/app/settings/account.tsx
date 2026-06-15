@@ -17,9 +17,6 @@ export default function AccountScreen() {
         <Text style={styles.email}>{user?.email ?? 'Unknown email'}</Text>
       </View>
 
-      <AppButton variant="danger" disabled>
-        Delete Account
-      </AppButton>
       <Text style={styles.note}>Account deletion is not available in this MVP.</Text>
 
       <AppButton variant="secondary" onPress={() => router.back()}>
@@ -32,7 +29,7 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
     padding: 18,

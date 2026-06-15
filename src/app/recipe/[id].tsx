@@ -102,11 +102,11 @@ export default function RecipeDetailScreen() {
 const styles = StyleSheet.create({
   section: {
     backgroundColor: palette.paper,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: palette.line,
     padding: 18,
-    gap: 10,
+    gap: 12,
   },
   sectionTitle: {
     color: palette.ink,
@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     color: palette.ink,
-    fontSize: 17,
-    lineHeight: 26,
+    fontSize: 16,
+    lineHeight: 25,
     fontWeight: '600',
   },
   ingredientHeading: {
@@ -129,24 +129,25 @@ const styles = StyleSheet.create({
   stepRow: {
     flexDirection: 'row',
     gap: 12,
+    alignItems: 'flex-start',
   },
   stepNumber: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: palette.sage,
     color: palette.herb,
     textAlign: 'center',
-    lineHeight: 30,
+    lineHeight: 32,
     fontSize: 15,
     fontWeight: '900',
   },
   stepText: {
     flex: 1,
     color: palette.ink,
-    fontSize: 17,
-    lineHeight: 26,
+    fontSize: 16,
+    lineHeight: 25,
     fontWeight: '600',
   },
   actions: {
