@@ -17,7 +17,6 @@ export default function AboutScreen() {
         </Text>
         <Text style={styles.version}>Version 0.1.0</Text>
       </View>
-
     </Screen>
   );
 }

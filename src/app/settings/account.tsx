@@ -19,7 +19,6 @@ export default function AccountScreen() {
       </View>
 
       <Text style={styles.note}>Account deletion is not available in this MVP.</Text>
-
     </Screen>
   );
 }

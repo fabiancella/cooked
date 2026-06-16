@@ -77,7 +77,9 @@ export default function RecipeDetailScreen() {
           {recipe.steps.map((step, index) => (
             <View key={`${step}-${index}`} style={styles.stepRow}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
-              <Text style={styles.stepText}>{step}</Text>
+              <View style={styles.stepTextBox}>
+                <Text style={styles.stepText}>{step}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -132,7 +134,6 @@ const styles = StyleSheet.create({
   stepRow: {
     width: '100%',
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'flex-start',
   },
   stepList: {
@@ -142,6 +143,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     flexShrink: 0,
+    marginRight: 12,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: palette.sage,
@@ -152,13 +154,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   stepText: {
-    flex: 1,
     flexShrink: 1,
-    minWidth: 0,
     color: palette.ink,
     fontSize: 16,
-    lineHeight: 25,
     fontWeight: '600',
+    flexWrap: 'wrap',
+  },
+  stepTextBox: {
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   actions: {
     gap: 10,

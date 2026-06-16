@@ -10,7 +10,6 @@ export default function CookingModeScreen() {
   const { getRecipe } = useRecipes();
   const recipe = getRecipe(id);
   const [stepIndex, setStepIndex] = useState(0);
-  const [checkedSteps, setCheckedSteps] = useState<string[]>([]);
 
   if (!recipe) {
     return (
@@ -22,16 +21,6 @@ export default function CookingModeScreen() {
   }
 
   const progress = ((stepIndex + 1) / recipe.steps.length) * 100;
-  const currentStepKey = `${recipe.id}-${stepIndex}`;
-  const currentStepIsChecked = checkedSteps.includes(currentStepKey);
-
-  const toggleCurrentStep = () => {
-    setCheckedSteps((current) =>
-      current.includes(currentStepKey)
-        ? current.filter((step) => step !== currentStepKey)
-        : [...current, currentStepKey],
-    );
-  };
 
   return (
     <Screen contentStyle={styles.content}>
@@ -45,7 +34,6 @@ export default function CookingModeScreen() {
       <View style={styles.stepCard}>
         <Text style={styles.stepLabel}>Step {stepIndex + 1}</Text>
         <Text style={styles.stepText}>{recipe.steps[stepIndex]}</Text>
-      
       </View>
 
       <View style={styles.controls}>
@@ -84,6 +72,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.tomato,
   },
   stepCard: {
+    width: '100%',
     minHeight: 360,
     backgroundColor: palette.paper,
     borderRadius: 18,
@@ -100,35 +89,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   stepText: {
+    flexShrink: 1,
+    minWidth: 0,
     color: palette.ink,
     fontSize: 24,
     lineHeight: 34,
     fontWeight: '800',
-  },
-  checkButton: {
-    minHeight: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D4E1D0',
-    backgroundColor: palette.sage,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  checkButtonActive: {
-    backgroundColor: palette.herb,
-    borderColor: palette.herb,
-  },
-  checkButtonText: {
-    color: palette.herb,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  checkButtonTextActive: {
-    color: palette.paper,
-  },
-  pressed: {
-    opacity: 0.72,
   },
   controls: {
     flexDirection: 'row',
