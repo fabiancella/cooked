@@ -2,11 +2,12 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { BackButton, Header, palette, Screen } from '@/components/recipe-ui';
 
 export default function AboutScreen() {
   return (
     <Screen>
+      <BackButton onPress={() => router.back()} label="Settings" />
       <Header eyebrow="Settings" title="About" subtitle="Cooked" />
 
       <View style={styles.panel}>
@@ -17,9 +18,6 @@ export default function AboutScreen() {
         <Text style={styles.version}>Version 0.1.0</Text>
       </View>
 
-      <AppButton variant="secondary" onPress={() => router.back()}>
-        Back
-      </AppButton>
     </Screen>
   );
 }

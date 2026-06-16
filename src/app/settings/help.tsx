@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { BackButton, Header, palette, Screen } from '@/components/recipe-ui';
 
 const helpSteps = [
   'Paste recipe text, notes, or a caption into Add Recipe.',
@@ -14,6 +14,7 @@ const helpSteps = [
 export default function HelpScreen() {
   return (
     <Screen>
+      <BackButton onPress={() => router.back()} label="Settings" />
       <Header eyebrow="Settings" title="Help" subtitle="How to add a recipe." />
 
       <View style={styles.panel}>
@@ -25,9 +26,6 @@ export default function HelpScreen() {
         ))}
       </View>
 
-      <AppButton variant="secondary" onPress={() => router.back()}>
-        Back
-      </AppButton>
     </Screen>
   );
 }

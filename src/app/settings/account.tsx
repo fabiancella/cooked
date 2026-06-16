@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { BackButton, Header, palette, Screen } from '@/components/recipe-ui';
 import { useAuth } from '@/context/auth-store';
 
 export default function AccountScreen() {
@@ -10,6 +10,7 @@ export default function AccountScreen() {
 
   return (
     <Screen>
+      <BackButton onPress={() => router.back()} label="Settings" />
       <Header eyebrow="Settings" title="Account" subtitle="Manage your Cooked account." />
 
       <View style={styles.panel}>
@@ -19,9 +20,6 @@ export default function AccountScreen() {
 
       <Text style={styles.note}>Account deletion is not available in this MVP.</Text>
 
-      <AppButton variant="secondary" onPress={() => router.back()}>
-        Back
-      </AppButton>
     </Screen>
   );
 }

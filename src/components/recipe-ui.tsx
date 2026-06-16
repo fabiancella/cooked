@@ -61,6 +61,14 @@ export function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: 
   );
 }
 
+export function BackButton({ onPress, label = 'Back' }: { onPress: () => void; label?: string }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+      <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={18} tintColor={palette.herb} />
+    </Pressable>
+  );
+}
+
 type ButtonProps = PressableProps &
   PropsWithChildren<{
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
@@ -171,6 +179,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 23,
     fontWeight: '500',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    minHeight: 35,
+    borderRadius: 12,
+    backgroundColor: palette.sage,
+    borderWidth: 1,
+    borderColor: '#D4E1D0',
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  backButtonText: {
+    color: palette.herb,
+    fontSize: 15,
+    fontWeight: '900',
   },
   button: {
     minHeight: 52,

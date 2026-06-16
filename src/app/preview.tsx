@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton, EditableField, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, EditableField, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 import { formattedMockRecipe, Recipe } from '@/data/mock-recipes';
 
@@ -197,6 +197,7 @@ export default function PreviewRecipeScreen() {
 
   return (
     <Screen>
+      <BackButton onPress={() => router.back()} />
       <Header
         eyebrow={id ? 'Edit recipe' : 'Preview'}
         title={id ? 'Update recipe' : 'Formatted recipe'}

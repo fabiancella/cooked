@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, Header, palette, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
 export default function CookingModeScreen() {
@@ -35,6 +35,7 @@ export default function CookingModeScreen() {
 
   return (
     <Screen contentStyle={styles.content}>
+      <BackButton onPress={() => router.back()} label="Recipe" />
       <Header eyebrow="Cooking mode" title={recipe.title} subtitle={`Step ${stepIndex + 1} of ${recipe.steps.length}`} />
 
       <View style={styles.progressTrack}>

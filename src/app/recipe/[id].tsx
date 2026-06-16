@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
 function isIngredientHeading(ingredient: string) {
@@ -56,6 +56,7 @@ export default function RecipeDetailScreen() {
 
   return (
     <Screen>
+      <BackButton onPress={() => router.back()} label="Recipes" />
       <Header eyebrow={recipe.source} title={recipe.title} subtitle={`${recipe.cookTime} • ${recipe.servings}`} />
       <PlaceholderImage color={recipe.color} />
 
