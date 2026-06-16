@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AppButton, BackButton, Header, palette, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
@@ -45,11 +45,7 @@ export default function CookingModeScreen() {
       <View style={styles.stepCard}>
         <Text style={styles.stepLabel}>Step {stepIndex + 1}</Text>
         <Text style={styles.stepText}>{recipe.steps[stepIndex]}</Text>
-        <Pressable onPress={toggleCurrentStep} style={({ pressed }) => [styles.checkButton, currentStepIsChecked && styles.checkButtonActive, pressed && styles.pressed]}>
-          <Text style={[styles.checkButtonText, currentStepIsChecked && styles.checkButtonTextActive]}>
-            {currentStepIsChecked ? 'Step checked' : 'Check off step'}
-          </Text>
-        </Pressable>
+      
       </View>
 
       <View style={styles.controls}>
