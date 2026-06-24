@@ -56,7 +56,7 @@ export default function RecipeDetailScreen() {
 
   return (
     <Screen>
-      <BackButton onPress={() => router.back()} label="Recipes" />
+      <BackButton onPress={() => router.dismissTo('/')} label="Recipes" />
       <Header eyebrow={recipe.source} title={recipe.title} subtitle={`${recipe.cookTime} • ${recipe.servings}`} />
       <PlaceholderImage color={recipe.color} />
 

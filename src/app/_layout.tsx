@@ -4,6 +4,7 @@ import React from 'react';
 import { ActivityIndicator, Text, useColorScheme } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
+import { PendingSharedImportProcessor } from '@/components/pending-shared-import-processor';
 import { Header, palette, Screen } from '@/components/recipe-ui';
 import { AuthProvider, useAuth } from '@/context/auth-store';
 import { RecipeProvider } from '@/context/recipe-store';
@@ -27,6 +28,7 @@ function AppContent() {
 
   return (
     <RecipeProvider>
+      <PendingSharedImportProcessor />
       <Stack
         screenOptions={{
           headerShown: false,

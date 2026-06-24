@@ -16,7 +16,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <Screen>
+    <Screen bottomPadding={24}>
       <Header eyebrow="Cooked" title="Your saved recipes" subtitle="Clean recipe cards from pasted text, captions, and notes." />
 
       <View style={styles.searchBox}>

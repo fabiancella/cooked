@@ -10,9 +10,9 @@ import {
   View,
 } from 'react-native';
 
-import { AppButton, BackButton, EditableField, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
-import { formattedMockRecipe, Recipe } from '@/data/mock-recipes';
+import { Recipe } from '@/data/types';
 
 const COOK_TIME_OPTIONS = [
   'Time TBD',
@@ -45,6 +45,54 @@ const SERVING_OPTIONS = [
 ];
 
 const WHEEL_ROW_HEIGHT = 48;
+
+function getListItems(value: string) {
+  return value
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isIngredientHeading(ingredient: string) {
+  return /^[^:]{2,45}:$/.test(ingredient.trim());
+}
+
+function getValidationError(title: string, ingredients: string[], steps: string[]) {
+  const ingredientCount = ingredients.filter((ingredient) => !isIngredientHeading(ingredient)).length;
+
+  if (!title.trim()) {
+    return 'Add a recipe title before saving.';
+  }
+
+  if (ingredientCount < 2) {
+    return 'Add at least two ingredients before saving.';
+  }
+
+  if (steps.length < 2) {
+    return 'Add at least two steps before saving.';
+  }
+
+  return null;
+}
+
+function getServingLabel(value?: string | null) {
+  const trimmedValue = value?.trim() ?? '';
+
+  if (!trimmedValue) {
+    return 'Servings TBD';
+  }
+
+  const servingCount =
+    trimmedValue.match(/^\d+$/)?.[0] ??
+    trimmedValue.match(/^(\d+)\s*(?:servings?|people|persons?)\b/i)?.[1] ??
+    trimmedValue.match(/\b(?:serves|servings|serving|yield|makes)\s*:?\s*(\d+)\b/i)?.[1];
+
+  if (servingCount) {
+    return servingCount === '1' ? '1 serving' : `${servingCount} servings`;
+  }
+
+  return trimmedValue;
+}
 
 function parseRecipeParam(recipeParam?: string) {
   if (!recipeParam) {
@@ -154,36 +202,60 @@ function WheelPickerField({
 
 export default function PreviewRecipeScreen() {
   const { id, recipe } = useLocalSearchParams<{ id?: string; recipe?: string }>();
-  const { addRecipe, error, getRecipe, updateRecipe } = useRecipes();
+  const { addRecipe, error, getRecipe, loading, updateRecipe } = useRecipes();
   const existingRecipe = id ? getRecipe(id) : undefined;
   const formattedRecipe = useMemo(() => parseRecipeParam(recipe), [recipe]);
-  const initialRecipe = existingRecipe ?? formattedRecipe ?? formattedMockRecipe;
+  const initialRecipe = existingRecipe ?? formattedRecipe;
   const [isSaving, setIsSaving] = useState(false);
-  const [title, setTitle] = useState(initialRecipe.title);
-  const [cookTime, setCookTime] = useState(initialRecipe.cookTime);
-  const [servings, setServings] = useState(initialRecipe.servings);
-  const [ingredientsText, setIngredientsText] = useState(initialRecipe.ingredients.join('\n'));
-  const [stepsText, setStepsText] = useState(initialRecipe.steps.join('\n'));
+  const [title, setTitle] = useState(initialRecipe?.title ?? '');
+  const [cookTime, setCookTime] = useState(initialRecipe?.cookTime ?? '');
+  const [servings, setServings] = useState(() => getServingLabel(initialRecipe?.servings));
+  const [ingredientsText, setIngredientsText] = useState(initialRecipe?.ingredients.join('\n') ?? '');
+  const [stepsText, setStepsText] = useState(initialRecipe?.steps.join('\n') ?? '');
+
+  useEffect(() => {
+    if (!initialRecipe) {
+      return;
+    }
+
+    setTitle(initialRecipe.title);
+    setCookTime(initialRecipe.cookTime);
+    setServings(getServingLabel(initialRecipe.servings));
+    setIngredientsText(initialRecipe.ingredients.join('\n'));
+    setStepsText(initialRecipe.steps.join('\n'));
+  }, [initialRecipe]);
+
+  const ingredients = useMemo(() => getListItems(ingredientsText), [ingredientsText]);
+  const steps = useMemo(() => getListItems(stepsText), [stepsText]);
+  const validationError = useMemo(() => getValidationError(title, ingredients, steps), [ingredients, steps, title]);
+  const isSaveDisabled = isSaving || Boolean(validationError);
+
+  const goBackFromPreview = () => {
+    if (id) {
+      router.dismissTo({ pathname: '/recipe/[id]', params: { id } });
+      return;
+    }
+
+    router.dismissTo('/add');
+  };
 
   const editedRecipe = useMemo(
-    () => ({
+    () => initialRecipe ? ({
       ...initialRecipe,
-      title: title.trim() || 'Untitled Recipe',
+      title: title.trim(),
       cookTime: cookTime.trim() || 'Cook time TBD',
-      servings: servings.trim() || 'Servings TBD',
-      ingredients: ingredientsText
-        .split('\n')
-        .map((ingredient) => ingredient.trim())
-        .filter(Boolean),
-      steps: stepsText
-        .split('\n')
-        .map((step) => step.trim())
-        .filter(Boolean),
-    }),
-    [cookTime, ingredientsText, initialRecipe, servings, stepsText, title],
+      servings: getServingLabel(servings),
+      ingredients,
+      steps,
+    }) : null,
+    [cookTime, ingredients, initialRecipe, servings, steps, title],
   );
 
   const saveRecipe = async () => {
+    if (!editedRecipe || validationError) {
+      return;
+    }
+
     setIsSaving(true);
     const savedRecipe = id ? await updateRecipe(id, editedRecipe) : await addRecipe(editedRecipe);
     setIsSaving(false);
@@ -195,62 +267,100 @@ export default function PreviewRecipeScreen() {
     router.replace({ pathname: '/recipe/[id]', params: { id: savedRecipe.id } });
   };
 
+  if (id && loading && !existingRecipe) {
+    return (
+      <Screen>
+        <BackButton onPress={goBackFromPreview} />
+        <Header title="Loading recipe" subtitle="Fetching the recipe before editing." />
+      </Screen>
+    );
+  }
+
+  if (!initialRecipe) {
+    return (
+      <Screen>
+        <BackButton onPress={goBackFromPreview} />
+        <Header
+          eyebrow="Preview"
+          title="Preview unavailable"
+          subtitle="Format a recipe first, or open an existing saved recipe to edit it."
+        />
+        <View style={styles.actions}>
+          <AppButton onPress={() => router.replace('/add')} icon={{ ios: 'plus', android: 'add', web: 'add' }}>
+            Add Recipe
+          </AppButton>
+        </View>
+      </Screen>
+    );
+  }
+
   return (
-    <Screen>
-      <BackButton onPress={() => router.back()} />
-      <Header
-        eyebrow={id ? 'Edit recipe' : 'Preview'}
-        title={id ? 'Update recipe' : 'Formatted recipe'}
-        subtitle="Review the formatted fields before saving."
-      />
-      <PlaceholderImage color={initialRecipe.color} />
+    <>
+      <Screen>
+        <BackButton onPress={goBackFromPreview} />
+        <Header
+          eyebrow={id ? 'Edit recipe' : 'Preview'}
+          title={id ? 'Update recipe' : 'Formatted recipe'}
+          subtitle="Review the formatted fields before saving."
+        />
+        <PlaceholderImage color={initialRecipe.color} />
 
-      <EditableField label="Title">
-        <TextInput value={title} onChangeText={setTitle} style={styles.input} />
-      </EditableField>
-      <View style={styles.twoColumn}>
-        <WheelPickerField
-          label="Cook time"
-          value={cookTime}
-          options={COOK_TIME_OPTIONS}
-          onChange={setCookTime}
-        />
-        <WheelPickerField
-          label="Servings"
-          value={servings}
-          options={SERVING_OPTIONS}
-          onChange={setServings}
-        />
-      </View>
-      <EditableField label="Ingredients">
-        <TextInput
-          value={ingredientsText}
-          onChangeText={setIngredientsText}
-          multiline
-          textAlignVertical="top"
-          style={[styles.input, styles.multiInput]}
-        />
-      </EditableField>
-      <EditableField label="Steps">
-        <TextInput
-          value={stepsText}
-          onChangeText={setStepsText}
-          multiline
-          textAlignVertical="top"
-          style={[styles.input, styles.multiInput]}
-        />
-      </EditableField>
+        <EditableField label="Title">
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            style={styles.input}
+          />
+        </EditableField>
+        <View style={styles.twoColumn}>
+          <WheelPickerField
+            label="Cook time"
+            value={cookTime}
+            options={COOK_TIME_OPTIONS}
+            onChange={setCookTime}
+          />
+          <WheelPickerField
+            label="Servings"
+            value={servings}
+            options={SERVING_OPTIONS}
+            onChange={setServings}
+          />
+        </View>
+        <EditableField label="Ingredients">
+          <TextInput
+            value={ingredientsText}
+            onChangeText={setIngredientsText}
+            multiline
+            textAlignVertical="top"
+            style={[styles.input, styles.multiInput]}
+          />
+        </EditableField>
+        <EditableField label="Steps">
+          <TextInput
+            value={stepsText}
+            onChangeText={setStepsText}
+            multiline
+            textAlignVertical="top"
+            style={[styles.input, styles.multiInput]}
+          />
+        </EditableField>
 
-      <View style={styles.actions}>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <AppButton disabled={isSaving} onPress={saveRecipe} icon={{ ios: 'checkmark', android: 'check', web: 'check' }}>
-          {isSaving ? (id ? 'Updating...' : 'Saving...') : id ? 'Update Recipe' : 'Save Recipe'}
-        </AppButton>
-        <AppButton variant="danger" onPress={() => router.back()}>
-          Cancel
-        </AppButton>
-      </View>
-    </Screen>
+        <View style={styles.actions}>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
+          <AppButton
+            disabled={isSaveDisabled}
+            onPress={saveRecipe}
+            icon={{ ios: 'checkmark', android: 'check', web: 'check' }}>
+            {isSaving ? (id ? 'Updating...' : 'Saving...') : id ? 'Update Recipe' : 'Save Recipe'}
+          </AppButton>
+          <AppButton variant="danger" onPress={goBackFromPreview}>
+            Cancel
+          </AppButton>
+        </View>
+      </Screen>
+      <KeyboardDoneAccessory />
+    </>
   );
 }
 

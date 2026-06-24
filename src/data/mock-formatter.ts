@@ -1,4 +1,4 @@
-import { Recipe } from '@/data/mock-recipes';
+import { Recipe } from '@/data/types';
 
 const MAIN_INGREDIENTS = [
   { match: /\bchicken\b/i, title: 'Chicken' },

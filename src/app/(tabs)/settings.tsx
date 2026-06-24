@@ -25,7 +25,7 @@ export default function SettingsScreen() {
   const isSigningOut = action === 'signing-out';
 
   return (
-    <Screen>
+    <Screen bottomPadding={24}>
       <Header eyebrow="Settings" title="Preferences" subtitle={user?.email ?? 'Signed in'} />
       <View style={styles.panel}>
         {rows.map((row) => (

@@ -1,22 +1,22 @@
 import React, {
-  createContext,
-  PropsWithChildren,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    createContext,
+    PropsWithChildren,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from 'react';
 
 import { useAuth } from '@/context/auth-store';
-import { Recipe } from '@/data/mock-recipes';
 import {
-  addRecipe as addStoredRecipe,
-  deleteRecipe as deleteStoredRecipe,
-  loadRecipes,
-  updateRecipe as updateStoredRecipe,
+    addRecipe as addStoredRecipe,
+    deleteRecipe as deleteStoredRecipe,
+    loadRecipes,
+    updateRecipe as updateStoredRecipe,
 } from '@/data/storage';
+import { Recipe } from '@/data/types';
 
 function getRawErrorMessage(error: unknown) {
   if (error instanceof Error) {

@@ -9,6 +9,7 @@ Cooked is an Expo React Native app for saving recipes from messy text, social ca
 - User-owned recipe CRUD with Row Level Security
 - Searchable recipe list
 - Add Recipe flow for pasted recipe text, notes, or captions
+- iOS share import beta for public recipe text, captions, and recipe article URLs
 - Gemini recipe formatter through a Supabase Edge Function
 - Non-recipe input validation with readable errors and retry
 - Preview/edit before saving
@@ -26,6 +27,7 @@ Cooked is an Expo React Native app for saving recipes from messy text, social ca
 - Supabase Auth
 - Supabase Postgres
 - React Native AsyncStorage for Supabase session persistence
+- iOS App Groups for share extension handoff
 
 ## Project Structure
 
@@ -43,6 +45,8 @@ src/
     cooking/[id].tsx     Cooking mode
   components/
     auth-screen.tsx      Login and sign-up UI
+    pending-shared-import-processor.tsx
+                         Reads shared imports and auto-saves recipes
     recipe-ui.tsx        Shared UI components
   context/
     auth-store.tsx       Supabase Auth state and actions
@@ -52,7 +56,12 @@ src/
     mock-recipes.ts      Recipe type and fallback objects
     storage.ts           Supabase recipe table CRUD helpers
   lib/
+    pending-shared-import.ts
+                         App Group pending import storage bridge
+    recipe-formatting.ts Shared formatter client helpers
     supabase.ts          Supabase client setup
+targets/
+  cooked-share/          iOS share extension target
 supabase/
   functions/
     format-recipe/       Gemini formatter Edge Function
@@ -135,6 +144,22 @@ supabase functions deploy format-recipe
 7. `recipe-store` calls `src/data/storage.ts`.
 8. `storage.ts` inserts or updates rows in Supabase.
 9. Home loads recipes from Supabase for the logged-in user.
+
+## iOS Share Import Beta
+
+1. User shares a public URL or text/caption to Cooked from the iOS share sheet.
+2. The Cooked share extension saves the shared value to App Group storage.
+3. User opens Cooked manually.
+4. Cooked reads the pending import, clears it, formats it, saves it for the logged-in user, and opens the saved recipe.
+
+Beta limitations:
+
+- Works best when the shared page or caption contains ingredients and cooking steps.
+- Public recipe article URLs can use Gemini URL Context.
+- TikTok URLs can include public oEmbed metadata when available.
+- Instagram support is best-effort public page/caption extraction only.
+- Instagram/Reels or TikTok posts where the recipe only appears in video are not supported yet.
+- No transcription, OCR, screenshot upload, private scraping, or Android sharing is included yet.
 
 ## Not Built Yet
 

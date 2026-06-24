@@ -1,6 +1,8 @@
 import { SymbolView } from 'expo-symbols';
 import React, { PropsWithChildren } from 'react';
 import {
+  Keyboard,
+  Platform,
   Pressable,
   PressableProps,
   ScrollView,
@@ -11,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Recipe } from '@/data/mock-recipes';
+import { Recipe } from '@/data/types';
 
 export const palette = {
   cream: '#FFF8F0',
@@ -28,28 +30,32 @@ export const palette = {
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
   contentStyle?: ViewProps['style'];
+  bottomPadding?: number;
 }>;
 
-export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
+export function Screen({ children, scroll = true, contentStyle, bottomPadding = 32 }: ScreenProps) {
+  const contentStyles = [styles.content, { paddingBottom: bottomPadding }, contentStyle];
+
   if (!scroll) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={[styles.content, contentStyle]}>{children}</View>
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+        <View style={contentStyles}>{children}</View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top','left', 'right']} style={styles.safeArea}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, contentStyle]}>
+        contentContainerStyle={contentStyles}>
         {children}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
 
 export function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
   return (
@@ -101,6 +107,47 @@ export function AppButton({ children, variant = 'primary', icon, style, ...props
         {children}
       </Text>
     </Pressable>
+  );
+}
+
+export function KeyboardDoneAccessory() {
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener('keyboardWillShow', (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  if (Platform.OS !== 'ios') {
+    return null;
+  }
+
+  if (keyboardHeight <= 0) {
+    return null;
+  }
+
+  return (
+    <View pointerEvents="box-none" style={[styles.keyboardAccessoryOverlay, { bottom: keyboardHeight + 10 }]}>
+      <Pressable
+        accessibilityLabel="Dismiss keyboard"
+        onPress={Keyboard.dismiss}
+        style={({ pressed }) => [styles.keyboardDoneButton, pressed && styles.pressed]}>
+        <SymbolView name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }} size={34} tintColor="#007AFF" />
+      </Pressable>
+    </View>
   );
 }
 
@@ -156,7 +203,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 110,
     gap: 20,
   },
   header: {
@@ -226,6 +272,23 @@ const styles = StyleSheet.create({
     color: palette.ink,
     fontSize: 16,
     fontWeight: '800',
+  },
+  keyboardAccessoryOverlay: {
+    position: 'absolute',
+    right: 18,
+    zIndex: 20,
+  },
+  keyboardDoneButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: palette.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   primaryButtonText: {
     color: palette.paper,

@@ -1,4 +1,4 @@
-import { Recipe } from '@/data/mock-recipes';
+import { Recipe } from '@/data/types';
 import { supabase } from '@/lib/supabase';
 
 type RecipeRow = {
