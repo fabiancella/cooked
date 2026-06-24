@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
@@ -45,16 +46,26 @@ const SERVING_OPTIONS = [
 ];
 
 const WHEEL_ROW_HEIGHT = 48;
+const MIN_STEP_INPUT_HEIGHT = 28;
 
-function getListItems(value: string) {
-  return value
-    .split('\n')
+function getCleanItems(values: string[]) {
+  return values
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
 function isIngredientHeading(ingredient: string) {
   return /^[^:]{2,45}:$/.test(ingredient.trim());
+}
+
+function isSubIngredient(ingredients: string[], index: number) {
+  for (let currentIndex = index - 1; currentIndex >= 0; currentIndex -= 1) {
+    if (isIngredientHeading(ingredients[currentIndex])) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function getValidationError(title: string, ingredients: string[], steps: string[]) {
@@ -210,8 +221,9 @@ export default function PreviewRecipeScreen() {
   const [title, setTitle] = useState(initialRecipe?.title ?? '');
   const [cookTime, setCookTime] = useState(initialRecipe?.cookTime ?? '');
   const [servings, setServings] = useState(() => getServingLabel(initialRecipe?.servings));
-  const [ingredientsText, setIngredientsText] = useState(initialRecipe?.ingredients.join('\n') ?? '');
-  const [stepsText, setStepsText] = useState(initialRecipe?.steps.join('\n') ?? '');
+  const [ingredientRows, setIngredientRows] = useState(initialRecipe?.ingredients ?? []);
+  const [stepRows, setStepRows] = useState(initialRecipe?.steps ?? []);
+  const [stepInputHeights, setStepInputHeights] = useState<number[]>([]);
 
   useEffect(() => {
     if (!initialRecipe) {
@@ -221,14 +233,60 @@ export default function PreviewRecipeScreen() {
     setTitle(initialRecipe.title);
     setCookTime(initialRecipe.cookTime);
     setServings(getServingLabel(initialRecipe.servings));
-    setIngredientsText(initialRecipe.ingredients.join('\n'));
-    setStepsText(initialRecipe.steps.join('\n'));
+    setIngredientRows(initialRecipe.ingredients);
+    setStepRows(initialRecipe.steps);
+    setStepInputHeights([]);
   }, [initialRecipe]);
 
-  const ingredients = useMemo(() => getListItems(ingredientsText), [ingredientsText]);
-  const steps = useMemo(() => getListItems(stepsText), [stepsText]);
+  const ingredients = useMemo(() => getCleanItems(ingredientRows), [ingredientRows]);
+  const steps = useMemo(() => getCleanItems(stepRows), [stepRows]);
   const validationError = useMemo(() => getValidationError(title, ingredients, steps), [ingredients, steps, title]);
   const isSaveDisabled = isSaving || Boolean(validationError);
+
+  const addIngredientRow = () => {
+    setIngredientRows((currentRows) => [...currentRows, '']);
+  };
+
+  const addIngredientSection = () => {
+    setIngredientRows((currentRows) => [...currentRows, 'New section:']);
+  };
+
+  const updateIngredientRow = (index: number, value: string) => {
+    setIngredientRows((currentRows) =>
+      currentRows.map((ingredient, ingredientIndex) => ingredientIndex === index ? value : ingredient),
+    );
+  };
+
+  const removeIngredientRow = (index: number) => {
+    setIngredientRows((currentRows) => currentRows.filter((_, ingredientIndex) => ingredientIndex !== index));
+  };
+
+  const addStepRow = () => {
+    setStepRows((currentRows) => [...currentRows, '']);
+  };
+
+  const updateStepRow = (index: number, value: string) => {
+    setStepRows((currentRows) => currentRows.map((step, stepIndex) => stepIndex === index ? value : step));
+  };
+
+  const removeStepRow = (index: number) => {
+    setStepRows((currentRows) => currentRows.filter((_, stepIndex) => stepIndex !== index));
+    setStepInputHeights((currentHeights) => currentHeights.filter((_, stepIndex) => stepIndex !== index));
+  };
+
+  const updateStepInputHeight = (index: number, height: number) => {
+    setStepInputHeights((currentHeights) => {
+      const nextHeight = Math.max(MIN_STEP_INPUT_HEIGHT, Math.ceil(height));
+
+      if (currentHeights[index] === nextHeight) {
+        return currentHeights;
+      }
+
+      const nextHeights = [...currentHeights];
+      nextHeights[index] = nextHeight;
+      return nextHeights;
+    });
+  };
 
   const goBackFromPreview = () => {
     if (id) {
@@ -305,11 +363,11 @@ export default function PreviewRecipeScreen() {
         />
         <PlaceholderImage color={initialRecipe.color} />
 
-        <EditableField label="Title">
+        <EditableField compact label="Title">
           <TextInput
             value={title}
             onChangeText={setTitle}
-            style={styles.input}
+            style={[styles.input, styles.titleInput]}
           />
         </EditableField>
         <View style={styles.twoColumn}>
@@ -327,22 +385,89 @@ export default function PreviewRecipeScreen() {
           />
         </View>
         <EditableField label="Ingredients">
-          <TextInput
-            value={ingredientsText}
-            onChangeText={setIngredientsText}
-            multiline
-            textAlignVertical="top"
-            style={[styles.input, styles.multiInput]}
-          />
+          <View style={styles.editorList}>
+            {ingredientRows.map((ingredient, index) => {
+              const isHeading = isIngredientHeading(ingredient);
+              const isNested = !isHeading && isSubIngredient(ingredientRows, index);
+
+              return (
+                <View
+                  key={`ingredient-${index}`}
+                  style={[
+                    styles.ingredientRow,
+                    isHeading && styles.ingredientHeadingRow,
+                    isNested && styles.subIngredientRow,
+                  ]}>
+                  {isHeading ? (
+                    <View style={styles.headingMarker}>
+                      <SymbolView name={{ ios: 'list.bullet.indent', android: 'format_indent_increase', web: 'format_indent_increase' }} size={18} tintColor={palette.herb} />
+                    </View>
+                  ) : (
+                    <View style={styles.checkButton} />
+                  )}
+                  <TextInput
+                    value={ingredient}
+                    onChangeText={(value) => updateIngredientRow(index, value)}
+                    placeholder={isHeading ? 'Section name:' : 'Ingredient'}
+                    placeholderTextColor={palette.muted}
+                    style={[
+                      styles.input,
+                      styles.rowInput,
+                      isHeading && styles.ingredientHeadingInput,
+                      isNested && styles.subIngredientInput,
+                    ]}
+                  />
+                  <Pressable
+                    accessibilityLabel="Remove ingredient"
+                    onPress={() => removeIngredientRow(index)}
+                    style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
+                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
+                  </Pressable>
+                </View>
+              );
+            })}
+            <Pressable onPress={addIngredientRow} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
+              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={palette.herb} />
+              <Text style={styles.addRowText}>Add ingredient</Text>
+            </Pressable>
+            <Pressable onPress={addIngredientSection} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
+              <SymbolView name={{ ios: 'folder.badge.plus', android: 'create_new_folder', web: 'create_new_folder' }} size={20} tintColor={palette.herb} />
+              <Text style={styles.addRowText}>Add section</Text>
+            </Pressable>
+          </View>
         </EditableField>
         <EditableField label="Steps">
-          <TextInput
-            value={stepsText}
-            onChangeText={setStepsText}
-            multiline
-            textAlignVertical="top"
-            style={[styles.input, styles.multiInput]}
-          />
+          <View style={styles.editorList}>
+            {stepRows.map((step, index) => (
+              <View key={`step-${index}`} style={styles.stepEditorRow}>
+                <Text style={styles.stepEditorNumber}>{index + 1}</Text>
+                <TextInput
+                  value={step}
+                  onChangeText={(value) => updateStepRow(index, value)}
+                  onContentSizeChange={(event) => updateStepInputHeight(index, event.nativeEvent.contentSize.height)}
+                  multiline
+                  textAlignVertical="top"
+                  placeholder="Recipe step"
+                  placeholderTextColor={palette.muted}
+                  style={[
+                    styles.input,
+                    styles.stepInput,
+                    { height: stepInputHeights[index] ?? MIN_STEP_INPUT_HEIGHT },
+                  ]}
+                />
+                <Pressable
+                  accessibilityLabel="Remove step"
+                  onPress={() => removeStepRow(index)}
+                  style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
+                  <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
+                </Pressable>
+              </View>
+            ))}
+            <Pressable onPress={addStepRow} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
+              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={palette.herb} />
+              <Text style={styles.addRowText}>Add step</Text>
+            </Pressable>
+          </View>
         </EditableField>
 
         <View style={styles.actions}>
@@ -376,11 +501,90 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     padding: 0,
   },
-  multiInput: {
-    minHeight: 140,
+  titleInput: {
+    minHeight: 28,
   },
   actions: {
     gap: 10,
+  },
+  editorList: {
+    gap: 12,
+  },
+  ingredientRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ingredientHeadingRow: {
+    marginTop: 4,
+  },
+  subIngredientRow: {
+    paddingLeft: 28,
+  },
+  headingMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: palette.sage,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowInput: {
+    flex: 1,
+    minHeight: 36,
+  },
+  ingredientHeadingInput: {
+    color: palette.ink,
+    fontSize: 17,
+    fontWeight: '900',
+  },
+  subIngredientInput: {
+    color: palette.muted,
+  },
+  removeButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addRowButton: {
+    minHeight: 40,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addRowText: {
+    color: palette.herb,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  stepEditorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  stepEditorNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    overflow: 'hidden',
+    backgroundColor: palette.sage,
+    color: palette.herb,
+    fontSize: 14,
+    lineHeight: 30,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  stepInput: {
+    flex: 1,
   },
   errorText: {
     color: palette.tomato,

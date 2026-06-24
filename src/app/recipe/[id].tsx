@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import React, { useEffect, useState } from 'react';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton, BackButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
@@ -14,6 +15,25 @@ export default function RecipeDetailScreen() {
   const { deleteRecipe, error, getRecipe, loading } = useRecipes();
   const recipe = getRecipe(id);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [checkedIngredientIndexes, setCheckedIngredientIndexes] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    setCheckedIngredientIndexes(new Set());
+  }, [recipe?.id]);
+
+  const toggleIngredientChecked = (index: number) => {
+    setCheckedIngredientIndexes((currentIndexes) => {
+      const nextIndexes = new Set(currentIndexes);
+
+      if (nextIndexes.has(index)) {
+        nextIndexes.delete(index);
+      } else {
+        nextIndexes.add(index);
+      }
+
+      return nextIndexes;
+    });
+  };
 
   const deleteCurrentRecipe = async () => {
     setIsDeleting(true);
@@ -67,7 +87,28 @@ export default function RecipeDetailScreen() {
             return <Text key={`${ingredient}-${index}`} style={styles.ingredientHeading}>{ingredient}</Text>;
           }
 
-          return <Text key={`${ingredient}-${index}`} style={styles.bodyText}>• {ingredient}</Text>;
+          const isChecked = checkedIngredientIndexes.has(index);
+
+          return (
+            <Pressable
+              key={`${ingredient}-${index}`}
+              accessibilityLabel={isChecked ? 'Uncheck ingredient' : 'Check ingredient'}
+              onPress={() => toggleIngredientChecked(index)}
+              style={({ pressed }) => [styles.ingredientRow, pressed && styles.pressed]}>
+              <View style={styles.ingredientCheckButton}>
+                <SymbolView
+                  name={{
+                    ios: isChecked ? 'checkmark.circle.fill' : 'circle',
+                    android: isChecked ? 'check_circle' : 'radio_button_unchecked',
+                    web: isChecked ? 'check_circle' : 'circle',
+                  }}
+                  size={22}
+                  tintColor={isChecked ? '#007AFF' : palette.muted}
+                />
+              </View>
+              <Text style={[styles.bodyText, isChecked && styles.checkedIngredientText]}>{ingredient}</Text>
+            </Pressable>
+          );
         })}
       </View>
 
@@ -119,6 +160,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   bodyText: {
+    flex: 1,
+    minWidth: 0,
     color: palette.ink,
     fontSize: 16,
     lineHeight: 25,
@@ -130,6 +173,20 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontWeight: '900',
     marginTop: 6,
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  ingredientCheckButton: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkedIngredientText: {
+    color: palette.muted,
   },
   stepRow: {
     width: '100%',
@@ -168,6 +225,9 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  pressed: {
+    opacity: 0.72,
   },
   errorText: {
     color: palette.tomato,

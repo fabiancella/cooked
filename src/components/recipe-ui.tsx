@@ -172,11 +172,15 @@ export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () =>
   );
 }
 
-export function EditableField({ label, children }: PropsWithChildren<{ label: string }>) {
+export function EditableField({
+  compact = false,
+  label,
+  children,
+}: PropsWithChildren<{ compact?: boolean; label: string }>) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldBox}>
+      <View style={[styles.fieldBox, compact && styles.compactFieldBox]}>
         {typeof children === 'string' ? <Text style={styles.fieldText}>{children}</Text> : children}
       </View>
     </View>
@@ -373,6 +377,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.line,
     padding: 16,
+  },
+  compactFieldBox: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   fieldText: {
     color: palette.ink,
