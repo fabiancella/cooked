@@ -62,6 +62,10 @@ function getAuthErrorMessage(error: unknown) {
   return 'Something went wrong. Please try again.';
 }
 
+export function getNormalizedAuthError(error: unknown){
+  return getAuthErrorMessage(error).toLowerCase()
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,6 +147,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
           if (signUpError) {
             setError(getAuthErrorMessage(signUpError));
             return { success: false, needsEmailConfirmation: false };
+          }
+
+          const alreadyRegistered = data.user?.identities?.length === 0;
+
+          if (alreadyRegistered) {
+            setError("This account already exists");
+            return{ success: false, needsEmailConfirmation: false };
           }
 
           setSession(data.session);

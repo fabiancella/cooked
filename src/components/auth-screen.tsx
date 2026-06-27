@@ -33,6 +33,7 @@ export function AuthScreen() {
 
     if (result.success && result.needsEmailConfirmation) {
       setMessage('Account created. Check your email to confirm it before logging in.');
+      setMode('login')
     }
   };
 
@@ -41,7 +42,7 @@ export function AuthScreen() {
       <Header
         eyebrow="Cooked"
         title={mode === 'login' ? 'Log in' : 'Create account'}
-        subtitle="Sign in to save recipes to your Supabase account."
+        subtitle="Sign in to save recipes to your account."
       />
 
       <View style={styles.panel}>
@@ -72,7 +73,7 @@ export function AuthScreen() {
 
         <AppButton onPress={submit} disabled={isSubmitting || !email || !password}>
           {buttonText}
-        </AppButton>
+        </AppButton> 
         <AppButton
           variant="secondary"
           onPress={() => {

@@ -107,34 +107,12 @@ final class ShareViewController: UIViewController {
     titleLabel.numberOfLines = 0
 
     let subtitleLabel = UILabel()
-    subtitleLabel.text = "Save this recipe text or link and Cooked will format it when you open the app."
+    subtitleLabel.text = "Save this recipe link and Cooked will format it when you open the app."
     subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
     subtitleLabel.adjustsFontForContentSizeCategory = true
     subtitleLabel.textColor = .secondaryLabel
     subtitleLabel.textAlignment = .center
     subtitleLabel.numberOfLines = 0
-
-    previewLabel.text = sharedText?.isEmpty == false ? sharedText : "No URL or text found."
-    previewLabel.font = .preferredFont(forTextStyle: .callout)
-    previewLabel.adjustsFontForContentSizeCategory = true
-    previewLabel.textColor = .secondaryLabel
-    previewLabel.numberOfLines = 4
-    previewLabel.lineBreakMode = .byTruncatingTail
-
-    let previewBox = UIView()
-    previewBox.backgroundColor = creamColor
-    previewBox.layer.cornerRadius = 14
-    previewBox.layer.borderWidth = 1
-    previewBox.layer.borderColor = lineColor.cgColor
-    previewBox.addSubview(previewLabel)
-    previewLabel.translatesAutoresizingMaskIntoConstraints = false
-
-    NSLayoutConstraint.activate([
-      previewLabel.topAnchor.constraint(equalTo: previewBox.topAnchor, constant: 14),
-      previewLabel.leadingAnchor.constraint(equalTo: previewBox.leadingAnchor, constant: 14),
-      previewLabel.trailingAnchor.constraint(equalTo: previewBox.trailingAnchor, constant: -14),
-      previewLabel.bottomAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: -14),
-    ])
 
     let importButton = makeButton(title: "Import", backgroundColor: herbColor, titleColor: .white)
     importButton.addTarget(self, action: #selector(importTapped), for: .touchUpInside)
@@ -163,7 +141,7 @@ final class ShareViewController: UIViewController {
     cardView.layer.shadowRadius = 18
     cardView.layer.shadowOffset = CGSize(width: 0, height: 8)
 
-    let cardStack = UIStackView(arrangedSubviews: [headerStack, previewBox, buttonStack])
+    let cardStack = UIStackView(arrangedSubviews: [headerStack, buttonStack])
     cardStack.translatesAutoresizingMaskIntoConstraints = false
     cardStack.axis = .vertical
     cardStack.spacing = 18
@@ -234,7 +212,7 @@ final class ShareViewController: UIViewController {
     let iconLabel = UILabel()
     iconLabel.text = "✓"
     iconLabel.font = .systemFont(ofSize: 28, weight: .bold)
-    iconLabel.textColor = herbColor
+    iconLabel.textColor = lineColor
     iconLabel.textAlignment = .center
 
     let iconView = UIView()
