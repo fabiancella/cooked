@@ -29,11 +29,12 @@ export const palette = {
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
+  scrollEnabled?: boolean;
   contentStyle?: ViewProps['style'];
   bottomPadding?: number;
 }>;
 
-export function Screen({ children, scroll = true, contentStyle, bottomPadding = 32 }: ScreenProps) {
+export function Screen({ children, scroll = true, scrollEnabled = true, contentStyle, bottomPadding = 32 }: ScreenProps) {
   const contentStyles = [styles.content, { paddingBottom: bottomPadding }, contentStyle];
 
   if (!scroll) {
@@ -47,6 +48,7 @@ export function Screen({ children, scroll = true, contentStyle, bottomPadding = 
   return (
     <SafeAreaView edges={['top','left', 'right']} style={styles.safeArea}>
       <ScrollView
+        scrollEnabled={scrollEnabled}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={contentStyles}>

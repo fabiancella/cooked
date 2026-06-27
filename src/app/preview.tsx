@@ -2,7 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Modal,
+  PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -46,11 +49,32 @@ const SERVING_OPTIONS = [
 ];
 
 const WHEEL_ROW_HEIGHT = 48;
-const MIN_STEP_INPUT_HEIGHT = 28;
+const INGREDIENT_DRAG_ROW_HEIGHT = 56;
+const STEP_DRAG_ROW_HEIGHT = 64;
+const INGREDIENT_SECTION_PREFIX = '__section__:';
+let nextEditorRowId = 0;
+
+function getEditorRowId() {
+  nextEditorRowId += 1;
+  return `editor-row-${nextEditorRowId}`;
+}
+
+function getEditorRowIds(count: number) {
+  return Array.from({ length: count }, getEditorRowId);
+}
 
 function getCleanItems(values: string[]) {
   return values
-    .map((item) => item.trim())
+    .map((item) => {
+      const trimmedItem = item.trim();
+
+      if (!trimmedItem.startsWith(INGREDIENT_SECTION_PREFIX)) {
+        return trimmedItem;
+      }
+
+      const sectionName = trimmedItem.replace(INGREDIENT_SECTION_PREFIX, '').trim();
+      return sectionName ? `${sectionName}:` : '';
+    })
     .filter(Boolean);
 }
 
@@ -58,9 +82,36 @@ function isIngredientHeading(ingredient: string) {
   return /^[^:]{2,45}:$/.test(ingredient.trim());
 }
 
+function isIngredientSection(ingredient: string) {
+  return ingredient.trim().startsWith(INGREDIENT_SECTION_PREFIX) || isIngredientHeading(ingredient);
+}
+
+function getIngredientInputValue(ingredient: string) {
+  if (ingredient.trim().startsWith(INGREDIENT_SECTION_PREFIX)) {
+    return ingredient.replace(INGREDIENT_SECTION_PREFIX, '');
+  }
+
+  return isIngredientHeading(ingredient) ? ingredient.replace(/:$/, '') : ingredient;
+}
+
+function clampIndex(value: number, max: number) {
+  return Math.max(0, Math.min(value, max));
+}
+
+function moveRow<T>(rows: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) {
+    return rows;
+  }
+
+  const nextRows = [...rows];
+  const [movedRow] = nextRows.splice(fromIndex, 1);
+  nextRows.splice(toIndex, 0, movedRow);
+  return nextRows;
+}
+
 function isSubIngredient(ingredients: string[], index: number) {
   for (let currentIndex = index - 1; currentIndex >= 0; currentIndex -= 1) {
-    if (isIngredientHeading(ingredients[currentIndex])) {
+    if (isIngredientSection(ingredients[currentIndex])) {
       return true;
     }
   }
@@ -211,6 +262,49 @@ function WheelPickerField({
   );
 }
 
+function DragHandle({
+  index,
+  onDragEnd,
+  onDragMove,
+  onDragStart,
+  style,
+}: {
+  index: number;
+  onDragEnd: (index: number, y: number) => void;
+  onDragMove: (index: number, y: number) => void;
+  onDragStart: (index: number) => void;
+  style?: View['props']['style'];
+}) {
+  const indexRef = useRef(index);
+  const onDragEndRef = useRef(onDragEnd);
+  const onDragMoveRef = useRef(onDragMove);
+  const onDragStartRef = useRef(onDragStart);
+  indexRef.current = index;
+  onDragEndRef.current = onDragEnd;
+  onDragMoveRef.current = onDragMove;
+  onDragStartRef.current = onDragStart;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => onDragStartRef.current(indexRef.current),
+      onPanResponderMove: (_, gestureState) => onDragMoveRef.current(indexRef.current, gestureState.dy),
+      onPanResponderRelease: (_, gestureState) => onDragEndRef.current(indexRef.current, gestureState.dy),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderTerminate: () => onDragEndRef.current(indexRef.current, 0),
+    }),
+  ).current;
+
+  return (
+    <View style={[styles.dragHandle, style]} {...panResponder.panHandlers}>
+      <SymbolView name={{ ios: 'line.3.horizontal', android: 'drag_handle', web: 'drag_handle' }} size={18} tintColor={palette.muted} />
+    </View>
+  );
+}
+
 export default function PreviewRecipeScreen() {
   const { id, recipe } = useLocalSearchParams<{ id?: string; recipe?: string }>();
   const { addRecipe, error, getRecipe, loading, updateRecipe } = useRecipes();
@@ -222,8 +316,10 @@ export default function PreviewRecipeScreen() {
   const [cookTime, setCookTime] = useState(initialRecipe?.cookTime ?? '');
   const [servings, setServings] = useState(() => getServingLabel(initialRecipe?.servings));
   const [ingredientRows, setIngredientRows] = useState(initialRecipe?.ingredients ?? []);
+  const [ingredientRowIds, setIngredientRowIds] = useState(() => getEditorRowIds(initialRecipe?.ingredients.length ?? 0));
   const [stepRows, setStepRows] = useState(initialRecipe?.steps ?? []);
-  const [stepInputHeights, setStepInputHeights] = useState<number[]>([]);
+  const [stepRowIds, setStepRowIds] = useState(() => getEditorRowIds(initialRecipe?.steps.length ?? 0));
+  const [dragState, setDragState] = useState<{ type: 'ingredient' | 'step'; startIndex: number; index: number } | null>(null);
 
   useEffect(() => {
     if (!initialRecipe) {
@@ -234,8 +330,9 @@ export default function PreviewRecipeScreen() {
     setCookTime(initialRecipe.cookTime);
     setServings(getServingLabel(initialRecipe.servings));
     setIngredientRows(initialRecipe.ingredients);
+    setIngredientRowIds(getEditorRowIds(initialRecipe.ingredients.length));
     setStepRows(initialRecipe.steps);
-    setStepInputHeights([]);
+    setStepRowIds(getEditorRowIds(initialRecipe.steps.length));
   }, [initialRecipe]);
 
   const ingredients = useMemo(() => getCleanItems(ingredientRows), [ingredientRows]);
@@ -245,24 +342,73 @@ export default function PreviewRecipeScreen() {
 
   const addIngredientRow = () => {
     setIngredientRows((currentRows) => [...currentRows, '']);
+    setIngredientRowIds((currentIds) => [...currentIds, getEditorRowId()]);
   };
 
   const addIngredientSection = () => {
-    setIngredientRows((currentRows) => [...currentRows, 'New section:']);
+    setIngredientRows((currentRows) => [...currentRows, INGREDIENT_SECTION_PREFIX]);
+    setIngredientRowIds((currentIds) => [...currentIds, getEditorRowId()]);
   };
 
   const updateIngredientRow = (index: number, value: string) => {
     setIngredientRows((currentRows) =>
-      currentRows.map((ingredient, ingredientIndex) => ingredientIndex === index ? value : ingredient),
+      currentRows.map((ingredient, ingredientIndex) => {
+        if (ingredientIndex !== index) {
+          return ingredient;
+        }
+
+        if (isIngredientSection(ingredient)) {
+          return `${INGREDIENT_SECTION_PREFIX}${value.replace(/:$/, '')}`;
+        }
+
+        return value;
+      }),
     );
   };
 
   const removeIngredientRow = (index: number) => {
     setIngredientRows((currentRows) => currentRows.filter((_, ingredientIndex) => ingredientIndex !== index));
+    setIngredientRowIds((currentIds) => currentIds.filter((_, ingredientIndex) => ingredientIndex !== index));
+  };
+
+  const removeIngredientSection = (index: number) => {
+    let deleteUntilIndex = ingredientRows.findIndex(
+      (ingredient, ingredientIndex) => ingredientIndex > index && isIngredientSection(ingredient),
+    );
+    deleteUntilIndex = deleteUntilIndex === -1 ? ingredientRows.length : deleteUntilIndex;
+
+    setIngredientRows((currentRows) => {
+      return currentRows.filter((_, ingredientIndex) => ingredientIndex < index || ingredientIndex >= deleteUntilIndex);
+    });
+    setIngredientRowIds((currentIds) =>
+      currentIds.filter((_, ingredientIndex) => ingredientIndex < index || ingredientIndex >= deleteUntilIndex),
+    );
+  };
+
+  const confirmRemoveIngredientRow = (index: number) => {
+    if (!isIngredientSection(ingredientRows[index])) {
+      removeIngredientRow(index);
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      removeIngredientSection(index);
+      return;
+    }
+
+    Alert.alert(
+      'Delete section?',
+      'This will delete the entire section and it\'s ingredients.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => removeIngredientSection(index) },
+      ],
+    );
   };
 
   const addStepRow = () => {
     setStepRows((currentRows) => [...currentRows, '']);
+    setStepRowIds((currentIds) => [...currentIds, getEditorRowId()]);
   };
 
   const updateStepRow = (index: number, value: string) => {
@@ -271,21 +417,65 @@ export default function PreviewRecipeScreen() {
 
   const removeStepRow = (index: number) => {
     setStepRows((currentRows) => currentRows.filter((_, stepIndex) => stepIndex !== index));
-    setStepInputHeights((currentHeights) => currentHeights.filter((_, stepIndex) => stepIndex !== index));
+    setStepRowIds((currentIds) => currentIds.filter((_, stepIndex) => stepIndex !== index));
   };
 
-  const updateStepInputHeight = (index: number, height: number) => {
-    setStepInputHeights((currentHeights) => {
-      const nextHeight = Math.max(MIN_STEP_INPUT_HEIGHT, Math.ceil(height));
+  const startIngredientDrag = (index: number) => {
+    setDragState({ type: 'ingredient', startIndex: index, index });
+  };
 
-      if (currentHeights[index] === nextHeight) {
-        return currentHeights;
+  const moveIngredientDrag = (_index: number, y: number) => {
+    setDragState((currentDragState) => {
+      if (!currentDragState || currentDragState.type !== 'ingredient') {
+        return currentDragState;
       }
 
-      const nextHeights = [...currentHeights];
-      nextHeights[index] = nextHeight;
-      return nextHeights;
+      const targetIndex = clampIndex(
+        currentDragState.startIndex + Math.round(y / INGREDIENT_DRAG_ROW_HEIGHT),
+        ingredientRows.length - 1,
+      );
+
+      if (targetIndex === currentDragState.index) {
+        return currentDragState;
+      }
+
+      setIngredientRows((currentRows) => moveRow(currentRows, currentDragState.index, targetIndex));
+      setIngredientRowIds((currentIds) => moveRow(currentIds, currentDragState.index, targetIndex));
+      return { ...currentDragState, index: targetIndex };
     });
+  };
+
+  const finishIngredientDrag = () => {
+    setDragState(null);
+  };
+
+  const startStepDrag = (index: number) => {
+    setDragState({ type: 'step', startIndex: index, index });
+  };
+
+  const moveStepDrag = (_index: number, y: number) => {
+    setDragState((currentDragState) => {
+      if (!currentDragState || currentDragState.type !== 'step') {
+        return currentDragState;
+      }
+
+      const targetIndex = clampIndex(
+        currentDragState.startIndex + Math.round(y / STEP_DRAG_ROW_HEIGHT),
+        stepRows.length - 1,
+      );
+
+      if (targetIndex === currentDragState.index) {
+        return currentDragState;
+      }
+
+      setStepRows((currentRows) => moveRow(currentRows, currentDragState.index, targetIndex));
+      setStepRowIds((currentIds) => moveRow(currentIds, currentDragState.index, targetIndex));
+      return { ...currentDragState, index: targetIndex };
+    });
+  };
+
+  const finishStepDrag = () => {
+    setDragState(null);
   };
 
   const goBackFromPreview = () => {
@@ -354,7 +544,7 @@ export default function PreviewRecipeScreen() {
 
   return (
     <>
-      <Screen>
+      <Screen scrollEnabled={dragState === null}>
         <BackButton onPress={goBackFromPreview} />
         <Header
           eyebrow={id ? 'Edit recipe' : 'Preview'}
@@ -387,17 +577,26 @@ export default function PreviewRecipeScreen() {
         <EditableField label="Ingredients">
           <View style={styles.editorList}>
             {ingredientRows.map((ingredient, index) => {
-              const isHeading = isIngredientHeading(ingredient);
+              const isHeading = isIngredientSection(ingredient);
               const isNested = !isHeading && isSubIngredient(ingredientRows, index);
+              const isDragging = dragState?.type === 'ingredient' && dragState.index === index;
 
               return (
                 <View
-                  key={`ingredient-${index}`}
+                  key={ingredientRowIds[index]}
                   style={[
                     styles.ingredientRow,
                     isHeading && styles.ingredientHeadingRow,
                     isNested && styles.subIngredientRow,
+                    isDragging && styles.draggingRow,
                   ]}>
+                  <DragHandle
+                    index={index}
+                    onDragEnd={finishIngredientDrag}
+                    onDragMove={moveIngredientDrag}
+                    onDragStart={startIngredientDrag}
+                    style={styles.ingredientDragHandle}
+                  />
                   {isHeading ? (
                     <View style={styles.headingMarker}>
                       <SymbolView name={{ ios: 'list.bullet.indent', android: 'format_indent_increase', web: 'format_indent_increase' }} size={18} tintColor={palette.herb} />
@@ -406,9 +605,9 @@ export default function PreviewRecipeScreen() {
                     <View style={styles.checkButton} />
                   )}
                   <TextInput
-                    value={ingredient}
+                    value={getIngredientInputValue(ingredient)}
                     onChangeText={(value) => updateIngredientRow(index, value)}
-                    placeholder={isHeading ? 'Section name:' : 'Ingredient'}
+                    placeholder={isHeading ? 'Section name' : 'Ingredient'}
                     placeholderTextColor={palette.muted}
                     style={[
                       styles.input,
@@ -419,7 +618,7 @@ export default function PreviewRecipeScreen() {
                   />
                   <Pressable
                     accessibilityLabel="Remove ingredient"
-                    onPress={() => removeIngredientRow(index)}
+                    onPress={() => confirmRemoveIngredientRow(index)}
                     style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
                     <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
                   </Pressable>
@@ -432,37 +631,48 @@ export default function PreviewRecipeScreen() {
             </Pressable>
             <Pressable onPress={addIngredientSection} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
               <SymbolView name={{ ios: 'folder.badge.plus', android: 'create_new_folder', web: 'create_new_folder' }} size={20} tintColor={palette.herb} />
-              <Text style={styles.addRowText}>Add section</Text>
+              <Text style={styles.addRowText}>Add Section</Text>
             </Pressable>
           </View>
         </EditableField>
         <EditableField label="Steps">
           <View style={styles.editorList}>
-            {stepRows.map((step, index) => (
-              <View key={`step-${index}`} style={styles.stepEditorRow}>
-                <Text style={styles.stepEditorNumber}>{index + 1}</Text>
-                <TextInput
-                  value={step}
-                  onChangeText={(value) => updateStepRow(index, value)}
-                  onContentSizeChange={(event) => updateStepInputHeight(index, event.nativeEvent.contentSize.height)}
-                  multiline
-                  textAlignVertical="top"
-                  placeholder="Recipe step"
-                  placeholderTextColor={palette.muted}
+            {stepRows.map((step, index) => {
+              const isDragging = dragState?.type === 'step' && dragState.index === index;
+
+              return (
+                <View
+                  key={stepRowIds[index]}
                   style={[
-                    styles.input,
-                    styles.stepInput,
-                    { height: stepInputHeights[index] ?? MIN_STEP_INPUT_HEIGHT },
-                  ]}
-                />
-                <Pressable
-                  accessibilityLabel="Remove step"
-                  onPress={() => removeStepRow(index)}
-                  style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
-                  <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
-                </Pressable>
-              </View>
-            ))}
+                    styles.stepEditorRow,
+                    isDragging && styles.draggingRow,
+                  ]}>
+                  <DragHandle
+                    index={index}
+                    onDragEnd={finishStepDrag}
+                    onDragMove={moveStepDrag}
+                    onDragStart={startStepDrag}
+                  />
+                  <Text style={styles.stepEditorNumber}>{index + 1}</Text>
+                  <TextInput
+                    value={step}
+                    onChangeText={(value) => updateStepRow(index, value)}
+                    multiline
+                    scrollEnabled={false}
+                    textAlignVertical="top"
+                    placeholder="Recipe step"
+                    placeholderTextColor={palette.muted}
+                    style={[styles.input, styles.stepInput]}
+                  />
+                  <Pressable
+                    accessibilityLabel="Remove step"
+                    onPress={() => removeStepRow(index)}
+                    style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
+                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
+                  </Pressable>
+                </View>
+              );
+            })}
             <Pressable onPress={addStepRow} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
               <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={palette.herb} />
               <Text style={styles.addRowText}>Add step</Text>
@@ -516,11 +726,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  draggingRow: {
+    zIndex: 10,
+    opacity: 0.88,
+  },
+  dragHandle: {
+    width: 28,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ingredientDragHandle: {
+    marginTop: 2,
+  },
   ingredientHeadingRow: {
     marginTop: 4,
   },
   subIngredientRow: {
-    paddingLeft: 28,
+    paddingLeft: 24,
   },
   headingMarker: {
     width: 32,
@@ -585,6 +808,7 @@ const styles = StyleSheet.create({
   },
   stepInput: {
     flex: 1,
+    minHeight: 28,
   },
   errorText: {
     color: palette.tomato,
