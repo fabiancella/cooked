@@ -4,13 +4,17 @@ import UniformTypeIdentifiers
 final class ShareViewController: UIViewController {
   private let appGroupIdentifier = "group.com.fcella.cooked"
   private let pendingImportKey = "pendingSharedImport"
+  private let creamColor = UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1.0)
+  private let herbColor = UIColor(red: 0.255, green: 0.392, blue: 0.290, alpha: 1.0)
+  private let lineColor = UIColor(red: 0.918, green: 0.863, blue: 0.796, alpha: 1.0)
+  private let sageColor = UIColor(red: 0.918, green: 0.945, blue: 0.910, alpha: 1.0)
   private let previewLabel = UILabel()
   private var contentStack: UIStackView?
   private var sharedText: String?
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    view.backgroundColor = .systemBackground
+    view.backgroundColor = creamColor
 
     log("extension launched")
     findSharedText { [weak self] sharedText in
@@ -76,39 +80,107 @@ final class ShareViewController: UIViewController {
   private func showImportView(sharedText: String?) {
     contentStack?.removeFromSuperview()
 
+    let iconLabel = UILabel()
+    iconLabel.text = "🍳"
+    iconLabel.font = .systemFont(ofSize: 26)
+    iconLabel.textAlignment = .center
+
+    let iconView = UIView()
+    iconView.backgroundColor = sageColor
+    iconView.layer.cornerRadius = 26
+    iconView.translatesAutoresizingMaskIntoConstraints = false
+    iconView.addSubview(iconLabel)
+    iconLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    NSLayoutConstraint.activate([
+      iconView.widthAnchor.constraint(equalToConstant: 52),
+      iconView.heightAnchor.constraint(equalToConstant: 52),
+      iconLabel.centerXAnchor.constraint(equalTo: iconView.centerXAnchor),
+      iconLabel.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
+    ])
+
     let titleLabel = UILabel()
     titleLabel.text = "Import to Cooked?"
-    titleLabel.font = .preferredFont(forTextStyle: .title2)
+    titleLabel.font = .systemFont(ofSize: 25, weight: .bold)
     titleLabel.adjustsFontForContentSizeCategory = true
     titleLabel.textAlignment = .center
     titleLabel.numberOfLines = 0
 
+    let subtitleLabel = UILabel()
+    subtitleLabel.text = "Save this recipe text or link and Cooked will format it when you open the app."
+    subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+    subtitleLabel.adjustsFontForContentSizeCategory = true
+    subtitleLabel.textColor = .secondaryLabel
+    subtitleLabel.textAlignment = .center
+    subtitleLabel.numberOfLines = 0
+
     previewLabel.text = sharedText?.isEmpty == false ? sharedText : "No URL or text found."
-    previewLabel.font = .preferredFont(forTextStyle: .body)
+    previewLabel.font = .preferredFont(forTextStyle: .callout)
     previewLabel.adjustsFontForContentSizeCategory = true
     previewLabel.textColor = .secondaryLabel
-    previewLabel.numberOfLines = 5
+    previewLabel.numberOfLines = 4
     previewLabel.lineBreakMode = .byTruncatingTail
 
-    let importButton = UIButton(type: .system)
-    importButton.setTitle("Import", for: .normal)
-    importButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+    let previewBox = UIView()
+    previewBox.backgroundColor = creamColor
+    previewBox.layer.cornerRadius = 14
+    previewBox.layer.borderWidth = 1
+    previewBox.layer.borderColor = lineColor.cgColor
+    previewBox.addSubview(previewLabel)
+    previewLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    NSLayoutConstraint.activate([
+      previewLabel.topAnchor.constraint(equalTo: previewBox.topAnchor, constant: 14),
+      previewLabel.leadingAnchor.constraint(equalTo: previewBox.leadingAnchor, constant: 14),
+      previewLabel.trailingAnchor.constraint(equalTo: previewBox.trailingAnchor, constant: -14),
+      previewLabel.bottomAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: -14),
+    ])
+
+    let importButton = makeButton(title: "Import", backgroundColor: herbColor, titleColor: .white)
     importButton.addTarget(self, action: #selector(importTapped), for: .touchUpInside)
 
-    let cancelButton = UIButton(type: .system)
-    cancelButton.setTitle("Cancel", for: .normal)
-    cancelButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+    let cancelButton = makeButton(title: "Cancel", backgroundColor: sageColor, titleColor: herbColor)
     cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 
     let buttonStack = UIStackView(arrangedSubviews: [importButton, cancelButton])
-    buttonStack.axis = .horizontal
-    buttonStack.distribution = .fillEqually
+    buttonStack.axis = .vertical
+    buttonStack.distribution = .fill
     buttonStack.spacing = 12
 
-    let contentStack = UIStackView(arrangedSubviews: [titleLabel, previewLabel, buttonStack])
+    let headerStack = UIStackView(arrangedSubviews: [iconView, titleLabel, subtitleLabel])
+    headerStack.axis = .vertical
+    headerStack.spacing = 10
+    headerStack.alignment = .center
+
+    let cardView = UIView()
+    cardView.translatesAutoresizingMaskIntoConstraints = false
+    cardView.backgroundColor = .systemBackground
+    cardView.layer.cornerRadius = 24
+    cardView.layer.borderWidth = 1
+    cardView.layer.borderColor = lineColor.cgColor
+    cardView.layer.shadowColor = UIColor.black.cgColor
+    cardView.layer.shadowOpacity = 0.10
+    cardView.layer.shadowRadius = 18
+    cardView.layer.shadowOffset = CGSize(width: 0, height: 8)
+
+    let cardStack = UIStackView(arrangedSubviews: [headerStack, previewBox, buttonStack])
+    cardStack.translatesAutoresizingMaskIntoConstraints = false
+    cardStack.axis = .vertical
+    cardStack.spacing = 18
+    cardStack.alignment = .fill
+
+    cardView.addSubview(cardStack)
+
+    NSLayoutConstraint.activate([
+      cardStack.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 22),
+      cardStack.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 20),
+      cardStack.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -20),
+      cardStack.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20),
+    ])
+
+    let contentStack = UIStackView(arrangedSubviews: [cardView])
     contentStack.translatesAutoresizingMaskIntoConstraints = false
     contentStack.axis = .vertical
-    contentStack.spacing = 20
     contentStack.alignment = .fill
 
     view.addSubview(contentStack)
@@ -159,17 +231,38 @@ final class ShareViewController: UIViewController {
   private func showSuccessView(message: String) {
     contentStack?.removeFromSuperview()
 
+    let iconLabel = UILabel()
+    iconLabel.text = "✓"
+    iconLabel.font = .systemFont(ofSize: 28, weight: .bold)
+    iconLabel.textColor = herbColor
+    iconLabel.textAlignment = .center
+
+    let iconView = UIView()
+    iconView.backgroundColor = sageColor
+    iconView.layer.cornerRadius = 28
+    iconView.translatesAutoresizingMaskIntoConstraints = false
+    iconView.addSubview(iconLabel)
+    iconLabel.translatesAutoresizingMaskIntoConstraints = false
+
     let successLabel = UILabel()
     successLabel.text = message
-    successLabel.font = .preferredFont(forTextStyle: .headline)
+    successLabel.font = .systemFont(ofSize: 19, weight: .bold)
     successLabel.adjustsFontForContentSizeCategory = true
     successLabel.textAlignment = .center
     successLabel.numberOfLines = 0
 
-    let contentStack = UIStackView(arrangedSubviews: [successLabel])
+    NSLayoutConstraint.activate([
+      iconView.widthAnchor.constraint(equalToConstant: 56),
+      iconView.heightAnchor.constraint(equalToConstant: 56),
+      iconLabel.centerXAnchor.constraint(equalTo: iconView.centerXAnchor),
+      iconLabel.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
+    ])
+
+    let contentStack = UIStackView(arrangedSubviews: [iconView, successLabel])
     contentStack.translatesAutoresizingMaskIntoConstraints = false
     contentStack.axis = .vertical
-    contentStack.alignment = .fill
+    contentStack.spacing = 14
+    contentStack.alignment = .center
 
     view.addSubview(contentStack)
     self.contentStack = contentStack
@@ -190,6 +283,18 @@ final class ShareViewController: UIViewController {
   private func finish() {
     log("completeRequest called")
     extensionContext?.completeRequest(returningItems: nil)
+  }
+
+  private func makeButton(title: String, backgroundColor: UIColor, titleColor: UIColor) -> UIButton {
+    let button = UIButton(type: .system)
+    button.setTitle(title, for: .normal)
+    button.setTitleColor(titleColor, for: .normal)
+    button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+    button.titleLabel?.adjustsFontForContentSizeCategory = true
+    button.backgroundColor = backgroundColor
+    button.layer.cornerRadius = 14
+    button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+    return button
   }
 
   private func log(_ message: String) {
