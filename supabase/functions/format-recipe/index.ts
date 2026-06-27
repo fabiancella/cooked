@@ -9,6 +9,32 @@ const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_RETRY_STATUSES = [429, 500, 502, 503, 504];
 const GEMINI_RETRY_DELAYS_MS = [500, 1500, 3000];
+const GEMINI_RESPONSE_SCHEMA = {
+  type: 'object',
+  properties: {
+    isRecipe: { type: 'boolean' },
+    reason: { type: 'string' },
+    recipe: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        cookTime: { type: 'string' },
+        servings: { type: 'string' },
+        source: { type: 'string' },
+        ingredients: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        steps: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+      required: ['title', 'cookTime', 'servings', 'source', 'ingredients', 'steps'],
+    },
+  },
+  required: ['isRecipe'],
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,8 +56,9 @@ type FormattedRecipe = {
 
 type RecipeImportMode = 'paste' | 'shared-url';
 
-type TikTokMetadata = {
+type SocialMetadata = {
   authorName?: string;
+  description?: string;
   providerName?: string;
   title?: string;
 };
@@ -158,6 +185,31 @@ function hasUsefulRecipeMeta(value: string) {
   return Boolean(trimmedValue) && !/\b(TBD|unknown|not specified|not provided|n\/a)\b/i.test(trimmedValue);
 }
 
+function getRecipeValidationLog(value: unknown) {
+  if (!value || typeof value !== 'object') {
+    return {
+      valueType: typeof value,
+    };
+  }
+
+  const recipe = value as Record<string, unknown>;
+  const ingredients = recipe.ingredients;
+  const steps = recipe.steps;
+  const cookTime = typeof recipe.cookTime === 'string' ? recipe.cookTime.trim() : '';
+  const servings = typeof recipe.servings === 'string' ? recipe.servings.trim() : '';
+
+  return {
+    hasTitle: typeof recipe.title === 'string' && Boolean(recipe.title.trim()),
+    cookTimeType: typeof recipe.cookTime,
+    servingsType: typeof recipe.servings,
+    sourceType: typeof recipe.source,
+    ingredientCount: Array.isArray(ingredients) ? ingredients.length : null,
+    stepsCount: Array.isArray(steps) ? steps.length : null,
+    hasUsefulCookTime: typeof recipe.cookTime === 'string' && hasUsefulRecipeMeta(cookTime),
+    hasUsefulServings: typeof recipe.servings === 'string' && hasUsefulRecipeMeta(servings),
+  };
+}
+
 function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -221,25 +273,107 @@ function getGeminiText(value: unknown) {
   return typeof text === 'string' && text.trim() ? text : null;
 }
 
-function isHttpUrl(value: string) {
+function getParsedUrl(value: string) {
   try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    return new URL(value);
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isHttpUrl(value: string) {
+  const url = getParsedUrl(value);
+
+  return url?.protocol === 'http:' || url?.protocol === 'https:';
+}
+
+function getUrlLogDetails(value: string) {
+  const url = getParsedUrl(value);
+
+  if (!url) {
+    return {
+      parseFailed: true,
+    };
+  }
+
+  return {
+    host: url.hostname.toLowerCase(),
+    pathname: url.pathname,
+    hasQuery: Boolean(url.search),
+  };
+}
+
+function isHostOrSubdomain(host: string | undefined, domain: string) {
+  return host === domain || Boolean(host?.endsWith(`.${domain}`));
 }
 
 function isTikTokUrl(value: string) {
-  try {
-    const host = new URL(value).hostname.toLowerCase();
-    return host === 'tiktok.com' || host.endsWith('.tiktok.com');
-  } catch {
-    return false;
-  }
+  const host = getParsedUrl(value)?.hostname.toLowerCase();
+
+  return isHostOrSubdomain(host, 'tiktok.com');
 }
 
-function getMetadataPrompt(metadata: TikTokMetadata | null) {
+function isInstagramUrl(value: string) {
+  const host = getParsedUrl(value)?.hostname.toLowerCase();
+
+  return isHostOrSubdomain(host, 'instagram.com') || isHostOrSubdomain(host, 'instagr.am');
+}
+
+function decodeHtmlEntities(value: string) {
+  const namedEntities: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    quot: '"',
+  };
+
+  return value
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([a-f\d]+);/gi, (_match, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&([a-z]+);/gi, (match, entity) => namedEntities[entity.toLowerCase()] ?? match);
+}
+
+function getHtmlAttribute(tag: string, attribute: string) {
+  const match = tag.match(new RegExp(`\\s${attribute}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+  const value = match?.[2] ?? match?.[3] ?? match?.[4] ?? '';
+
+  return decodeHtmlEntities(value).trim();
+}
+
+function getMetaContent(html: string, names: string[]) {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
+  const normalizedNames = names.map((name) => name.toLowerCase());
+
+  for (const tag of metaTags) {
+    const name = getHtmlAttribute(tag, 'property') || getHtmlAttribute(tag, 'name');
+
+    if (!normalizedNames.includes(name.toLowerCase())) {
+      continue;
+    }
+
+    const content = getHtmlAttribute(tag, 'content');
+
+    if (content) {
+      return content;
+    }
+  }
+
+  return undefined;
+}
+
+function countMetaTags(html: string) {
+  return html.match(/<meta\b[^>]*>/gi)?.length ?? 0;
+}
+
+function getPageTitle(html: string) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = match?.[1] ? decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').trim() : '';
+
+  return title || undefined;
+}
+
+function getMetadataPrompt(metadata: SocialMetadata | null) {
   if (!metadata) {
     return '';
   }
@@ -250,16 +384,18 @@ function getMetadataPrompt(metadata: TikTokMetadata | null) {
     metadata.providerName ? `Provider: ${metadata.providerName}` : '',
     metadata.authorName ? `Author: ${metadata.authorName}` : '',
     metadata.title ? `Title or caption: ${metadata.title}` : '',
+    metadata.description ? `Description or caption: ${metadata.description}` : '',
   ].filter(Boolean).join('\n');
 }
 
-function getPrompt(text: string, importMode: RecipeImportMode, metadata: TikTokMetadata | null) {
+function getPrompt(text: string, importMode: RecipeImportMode, metadata: SocialMetadata | null) {
   const sourceLabel = importMode === 'shared-url' ? 'Shared URL or text:' : 'Pasted recipe text:';
   const sharedUrlInstructions =
     importMode === 'shared-url'
       ? [
           'The input may be a URL shared from Safari, TikTok, Instagram, or a recipe website.',
-          'If the input is a public URL, use URL context to read the public page or caption.',
+          'If the input is a public URL, use available URL context or public social metadata to read the public page or caption.',
+          'If public social metadata is provided, use that metadata as the public caption or page summary.',
           'If public page text, caption, or metadata does not contain enough ingredients and cooking steps, return isRecipe false.',
           'Do not invent ingredients or steps from a video-only post, title, thumbnail, or generic page.',
         ]
@@ -306,7 +442,7 @@ function getPrompt(text: string, importMode: RecipeImportMode, metadata: TikTokM
   ].join('\n');
 }
 
-async function getTikTokMetadata(url: string, requestId: string): Promise<TikTokMetadata | null> {
+async function getTikTokMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
   logImport(requestId, 'requesting TikTok oEmbed metadata');
   const response = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`);
 
@@ -329,6 +465,71 @@ async function getTikTokMetadata(url: string, requestId: string): Promise<TikTok
     titleLength: metadata.title?.length ?? 0,
     hasAuthor: Boolean(metadata.authorName),
   });
+
+  return metadata;
+}
+
+async function getInstagramMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
+  logImport(requestId, 'requesting Instagram public metadata', getUrlLogDetails(url));
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (compatible; CookedRecipeImporter/1.0)',
+    },
+  });
+
+  logImport(requestId, 'Instagram metadata response received', {
+    status: response.status,
+    statusText: response.statusText,
+    redirected: response.redirected,
+    responseUrl: getUrlLogDetails(response.url),
+    contentType: response.headers.get('content-type'),
+    contentLength: response.headers.get('content-length'),
+  });
+
+  if (!response.ok) {
+    logImport(requestId, 'Instagram metadata response was not ok');
+    return null;
+  }
+
+  const html = await response.text();
+  const pageTitle = getPageTitle(html);
+  const ogTitle = getMetaContent(html, ['og:title']);
+  const twitterTitle = getMetaContent(html, ['twitter:title']);
+  const ogDescription = getMetaContent(html, ['og:description']);
+  const pageDescription = getMetaContent(html, ['description']);
+  const twitterDescription = getMetaContent(html, ['twitter:description']);
+
+  logImport(requestId, 'Instagram metadata HTML parsed', {
+    htmlLength: html.length,
+    metaTagCount: countMetaTags(html),
+    hasPageTitle: Boolean(pageTitle),
+    pageTitleLength: pageTitle?.length ?? 0,
+    hasOgTitle: Boolean(ogTitle),
+    hasTwitterTitle: Boolean(twitterTitle),
+    hasOgDescription: Boolean(ogDescription),
+    hasPageDescription: Boolean(pageDescription),
+    hasTwitterDescription: Boolean(twitterDescription),
+  });
+
+  const metadata = {
+    providerName: 'Instagram',
+    title: ogTitle ?? twitterTitle ?? pageTitle,
+    description: ogDescription ?? pageDescription ?? twitterDescription,
+  };
+
+  logImport(requestId, 'Instagram metadata parsed', {
+    hasTitle: Boolean(metadata.title),
+    hasDescription: Boolean(metadata.description),
+    titleLength: metadata.title?.length ?? 0,
+    descriptionLength: metadata.description?.length ?? 0,
+  });
+
+  if (!metadata.title && !metadata.description) {
+    logImport(requestId, 'Instagram metadata empty after parsing');
+    return null;
+  }
 
   return metadata;
 }
@@ -407,14 +608,14 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
 
   const isSharedUrl = importMode === 'shared-url' && isHttpUrl(text);
   const isTikTokImport = isSharedUrl && isTikTokUrl(text);
-  const shouldUseUrlContext = isSharedUrl && !isTikTokImport;
-  let metadata: TikTokMetadata | null = null;
+  const isInstagramImport = isSharedUrl && isInstagramUrl(text);
+  let metadata: SocialMetadata | null = null;
 
   logImport(requestId, 'formatting started', {
     importMode,
     inputLength: text.length,
-    usesUrlContext: shouldUseUrlContext,
     isTikTok: isTikTokImport,
+    isInstagram: isInstagramImport,
   });
 
   if (isTikTokImport) {
@@ -425,7 +626,22 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
       logImport(requestId, 'TikTok oEmbed request failed', { message });
       metadata = null;
     }
+  } else if (isInstagramImport) {
+    try {
+      metadata = await getInstagramMetadata(text, requestId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Instagram metadata error';
+      logImport(requestId, 'Instagram metadata request failed', { message });
+      metadata = null;
+    }
   }
+  const shouldUseUrlContext = isSharedUrl && !isTikTokImport && (!isInstagramImport || !metadata);
+
+  logImport(requestId, 'Gemini request configured', {
+    hasMetadata: Boolean(metadata),
+    usesUrlContext: shouldUseUrlContext,
+  });
+
   const requestBody: Record<string, unknown> = {
     contents: [
       {
@@ -443,32 +659,7 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
   } else {
     requestBody.generationConfig = {
       responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          isRecipe: { type: 'boolean' },
-          reason: { type: 'string' },
-          recipe: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              cookTime: { type: 'string' },
-              servings: { type: 'string' },
-              source: { type: 'string' },
-              ingredients: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-              steps: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-            },
-            required: ['title', 'cookTime', 'servings', 'source', 'ingredients', 'steps'],
-          },
-        },
-        required: ['isRecipe'],
-      },
+      responseSchema: GEMINI_RESPONSE_SCHEMA,
     };
   }
 
@@ -508,18 +699,32 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
   const result = formatterResult as Record<string, unknown>;
 
   if (result.isRecipe !== true || !result.recipe) {
-    logImport(requestId, 'Gemini rejected input as non-recipe');
+    logImport(requestId, 'Gemini rejected input as non-recipe', {
+      importMode,
+      isInstagram: isInstagramImport,
+      hasMetadata: Boolean(metadata),
+      reasonType: typeof result.reason,
+      reasonLength: typeof result.reason === 'string' ? result.reason.length : 0,
+    });
     throw new RecipeValidationError();
   }
 
   const formattedRecipe = validateRecipe(result.recipe, text);
 
   if (!formattedRecipe) {
-    logImport(requestId, 'formatted recipe failed validation');
+    logImport(requestId, 'formatted recipe failed validation', {
+      importMode,
+      isInstagram: isInstagramImport,
+      hasMetadata: Boolean(metadata),
+      recipe: getRecipeValidationLog(result.recipe),
+    });
     throw new RecipeValidationError();
   }
 
   logImport(requestId, 'recipe formatted successfully', {
+    importMode,
+    isInstagram: isInstagramImport,
+    hasMetadata: Boolean(metadata),
     ingredientCount: formattedRecipe.ingredients.length,
     stepCount: formattedRecipe.steps.length,
   });
@@ -557,16 +762,19 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: 'Recipe text is required.' }, 400);
   }
 
+  const trimmedText = text.trim();
   const importMode: RecipeImportMode = requestedImportMode === 'shared-url' ? 'shared-url' : 'paste';
+  const isUrl = isHttpUrl(trimmedText);
 
   logImport(requestId, 'request received', {
     importMode,
-    inputLength: text.trim().length,
-    isUrl: isHttpUrl(text.trim()),
+    inputLength: trimmedText.length,
+    isUrl,
+    url: isUrl ? getUrlLogDetails(trimmedText) : null,
   });
 
   try {
-    const recipe = await formatWithGemini(text.trim(), importMode, requestId);
+    const recipe = await formatWithGemini(trimmedText, importMode, requestId);
 
     return jsonResponse({ recipe });
   } catch (error) {
