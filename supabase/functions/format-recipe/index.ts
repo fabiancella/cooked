@@ -52,6 +52,7 @@ type FormattedRecipe = {
   servings: string;
   source: string;
   sourceText: string;
+  imageUrl: string | null;
 };
 
 type RecipeImportMode = 'paste' | 'shared-url';
@@ -59,6 +60,7 @@ type RecipeImportMode = 'paste' | 'shared-url';
 type SocialMetadata = {
   authorName?: string;
   description?: string;
+  imageUrl?: string;
   providerName?: string;
   title?: string;
 };
@@ -210,7 +212,7 @@ function getRecipeValidationLog(value: unknown) {
   };
 }
 
-function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | null {
+function validateRecipe(value: unknown, sourceText: string, imageUrl?: string, source?: string): FormattedRecipe | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
@@ -249,8 +251,9 @@ function validateRecipe(value: unknown, sourceText: string): FormattedRecipe | n
     steps,
     cookTime,
     servings,
-    source: recipe.source,
+    source: source ?? recipe.source,
     sourceText,
+    imageUrl: imageUrl && isHttpUrl(imageUrl) ? imageUrl : null,
   };
 }
 
@@ -388,6 +391,24 @@ function getMetadataPrompt(metadata: SocialMetadata | null) {
   ].filter(Boolean).join('\n');
 }
 
+function getCleanAuthorName(authorName?: string) {
+  const cleanedAuthorName = authorName?.replace(/\s+/g, ' ').trim();
+
+  return cleanedAuthorName || null;
+}
+
+function getInstagramAuthorName(title?: string) {
+  const match = title?.match(/^(.+?)\s+on\s+Instagram:/i);
+
+  return getCleanAuthorName(match?.[1]);
+}
+
+function getSocialSource(source: string, metadata: SocialMetadata | null) {
+  const authorName = getCleanAuthorName(metadata?.authorName);
+
+  return authorName ? `${source} by ${authorName}` : source;
+}
+
 function getPrompt(text: string, importMode: RecipeImportMode, metadata: SocialMetadata | null) {
   const sourceLabel = importMode === 'shared-url' ? 'Shared URL or text:' : 'Pasted recipe text:';
   const sharedUrlInstructions =
@@ -432,7 +453,7 @@ function getPrompt(text: string, importMode: RecipeImportMode, metadata: SocialM
     'Never return blank, TBD, unknown, not specified, not provided, or n/a for cookTime or servings.',
     'Use short user-facing estimates like "35 min", "1 hr 15 min", "4 servings", or "12 cookies".',
     'Steps should stay as clear numbered cooking instructions, with one cooking action per step when possible.',
-    'Infer source as TikTok, Instagram, or Pasted text when possible.',
+    'Infer source as TikTok, Instagram, or Pasted text when possible. If a social author is provided, use a source like "TikTok by creator".',
     'Do not include markdown, comments, or any text outside the JSON object.',
     ...sharedUrlInstructions,
     getMetadataPrompt(metadata),
@@ -456,6 +477,7 @@ async function getTikTokMetadata(url: string, requestId: string): Promise<Social
 
   const metadata = {
     authorName: typeof data.author_name === 'string' ? data.author_name : undefined,
+    imageUrl: typeof data.thumbnail_url === 'string' ? data.thumbnail_url : undefined,
     providerName: typeof data.provider_name === 'string' ? data.provider_name : undefined,
     title: typeof data.title === 'string' ? data.title : undefined,
   };
@@ -464,6 +486,7 @@ async function getTikTokMetadata(url: string, requestId: string): Promise<Social
     hasTitle: Boolean(metadata.title),
     titleLength: metadata.title?.length ?? 0,
     hasAuthor: Boolean(metadata.authorName),
+    hasImage: Boolean(metadata.imageUrl),
   });
 
   return metadata;
@@ -493,6 +516,13 @@ async function getInstagramMetadata(url: string, requestId: string): Promise<Soc
     return null;
   }
 
+  const responseUrl = getParsedUrl(response.url);
+
+  if (responseUrl?.pathname.startsWith('/accounts/login')) {
+    logImport(requestId, 'Instagram redirected to login page');
+    return null;
+  }
+
   const html = await response.text();
   const pageTitle = getPageTitle(html);
   const ogTitle = getMetaContent(html, ['og:title']);
@@ -514,6 +544,7 @@ async function getInstagramMetadata(url: string, requestId: string): Promise<Soc
   });
 
   const metadata = {
+    authorName: getInstagramAuthorName(ogTitle ?? twitterTitle ?? pageTitle) ?? undefined,
     providerName: 'Instagram',
     title: ogTitle ?? twitterTitle ?? pageTitle,
     description: ogDescription ?? pageDescription ?? twitterDescription,
@@ -522,6 +553,7 @@ async function getInstagramMetadata(url: string, requestId: string): Promise<Soc
   logImport(requestId, 'Instagram metadata parsed', {
     hasTitle: Boolean(metadata.title),
     hasDescription: Boolean(metadata.description),
+    hasAuthor: Boolean(metadata.authorName),
     titleLength: metadata.title?.length ?? 0,
     descriptionLength: metadata.description?.length ?? 0,
   });
@@ -635,6 +667,11 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
       metadata = null;
     }
   }
+  const socialSource = isTikTokImport
+    ? getSocialSource('TikTok', metadata)
+    : isInstagramImport
+      ? getSocialSource('Instagram', metadata)
+      : undefined;
   const shouldUseUrlContext = isSharedUrl && !isTikTokImport && (!isInstagramImport || !metadata);
 
   logImport(requestId, 'Gemini request configured', {
@@ -709,7 +746,7 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
     throw new RecipeValidationError();
   }
 
-  const formattedRecipe = validateRecipe(result.recipe, text);
+  const formattedRecipe = validateRecipe(result.recipe, text, metadata?.imageUrl, socialSource);
 
   if (!formattedRecipe) {
     logImport(requestId, 'formatted recipe failed validation', {
@@ -725,6 +762,7 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
     importMode,
     isInstagram: isInstagramImport,
     hasMetadata: Boolean(metadata),
+    hasImage: Boolean(formattedRecipe.imageUrl),
     ingredientCount: formattedRecipe.ingredients.length,
     stepCount: formattedRecipe.steps.length,
   });

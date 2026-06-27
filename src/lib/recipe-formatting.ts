@@ -56,11 +56,11 @@ async function getFunctionErrorMessage(error: unknown) {
 }
 
 export function getRecipeColor(source?: string) {
-  if (source === 'TikTok') {
+  if (source?.startsWith('TikTok')) {
     return '#F18F7A';
   }
 
-  if (source === 'Instagram') {
+  if (source?.startsWith('Instagram')) {
     return '#F6C453';
   }
 
@@ -96,7 +96,7 @@ function getFormattedRecipe(data: FormattedRecipeResponse | null, fallbackText: 
     servings: recipe.servings,
     source: recipe.source,
     sourceText: typeof recipe.sourceText === 'string' ? recipe.sourceText : fallbackText,
-    imageUrl: null,
+    imageUrl: typeof recipe.imageUrl === 'string' ? recipe.imageUrl : null,
     color: getRecipeColor(recipe.source),
     ingredients: recipe.ingredients.filter((ingredient): ingredient is string => typeof ingredient === 'string'),
     steps: recipe.steps.filter((step): step is string => typeof step === 'string'),

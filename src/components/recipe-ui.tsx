@@ -1,6 +1,7 @@
 import { SymbolView } from 'expo-symbols';
 import React, { PropsWithChildren } from 'react';
 import {
+  Image,
   Keyboard,
   Platform,
   Pressable,
@@ -153,16 +154,38 @@ export function KeyboardDoneAccessory() {
   );
 }
 
+function getSourcePillBackground(source: string) {
+  if (source.startsWith('TikTok')) {
+    return '#FFE2D9';
+  }
+
+  if (source.startsWith('Instagram')) {
+    return '#FFF2C7';
+  }
+
+  if (source === 'Screenshot') {
+    return '#F7E0D2';
+  }
+
+  return '#FFF2DA';
+}
+
 export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () => void }) {
+  const sourcePillBackground = getSourcePillBackground(recipe.source);
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
-        <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={palette.paper} />
-      </View>
+      {recipe.imageUrl ? (
+        <Image source={{ uri: recipe.imageUrl }} style={styles.cardImage} />
+      ) : (
+        <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
+          <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={palette.paper} />
+        </View>
+      )}
       <View style={styles.cardBody}>
         <View style={styles.cardTitleRow}>
           <Text style={styles.cardTitle}>{recipe.title}</Text>
-          <Text style={styles.sourcePill}>{recipe.source}</Text>
+          <Text style={[styles.sourcePill, { backgroundColor: sourcePillBackground }]}>{recipe.source}</Text>
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>{recipe.cookTime}</Text>
@@ -195,6 +218,14 @@ export function PlaceholderImage({ color = palette.butter }: { color?: string })
       <SymbolView name={{ ios: 'photo', android: 'image', web: 'photo' }} size={34} tintColor={palette.paper} />
     </View>
   );
+}
+
+export function RecipeImage({ recipe }: { recipe: Recipe }) {
+  if (!recipe.imageUrl) {
+    return <PlaceholderImage color={recipe.color} />;
+  }
+
+  return <Image source={{ uri: recipe.imageUrl }} style={styles.heroPhoto} />;
 }
 
 const styles = StyleSheet.create({
@@ -325,6 +356,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardImage: {
+    width: '100%',
+    height: 132,
+  },
   cardBody: {
     padding: 16,
     gap: 10,
@@ -340,8 +375,6 @@ const styles = StyleSheet.create({
   },
   sourcePill: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFF2DA',
-    color: '#8C5A18',
     borderRadius: 999,
     overflow: 'hidden',
     paddingHorizontal: 10,
@@ -395,5 +428,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  heroPhoto: {
+    width: '100%',
+    height: 170,
+    borderRadius: 18,
   },
 });

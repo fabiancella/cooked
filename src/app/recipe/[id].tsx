@@ -3,7 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, BackButton, Header, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, Header, palette, RecipeImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
 function isIngredientHeading(ingredient: string) {
@@ -78,7 +78,7 @@ export default function RecipeDetailScreen() {
     <Screen>
       <BackButton onPress={() => router.dismissTo('/')} label="Recipes" />
       <Header eyebrow={recipe.source} title={recipe.title} subtitle={`${recipe.cookTime} • ${recipe.servings}`} />
-      <PlaceholderImage color={recipe.color} />
+      <RecipeImage recipe={recipe} />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ingredients</Text>

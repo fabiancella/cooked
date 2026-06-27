@@ -11,10 +11,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
+  View
 } from 'react-native';
 
-import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, palette, PlaceholderImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, palette, RecipeImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 import { Recipe } from '@/data/types';
 
@@ -479,6 +479,11 @@ export default function PreviewRecipeScreen() {
   };
 
   const goBackFromPreview = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
     if (id) {
       router.dismissTo({ pathname: '/recipe/[id]', params: { id } });
       return;
@@ -551,7 +556,7 @@ export default function PreviewRecipeScreen() {
           title={id ? 'Update recipe' : 'Formatted recipe'}
           subtitle="Review the formatted fields before saving."
         />
-        <PlaceholderImage color={initialRecipe.color} />
+        <RecipeImage recipe={initialRecipe} />
 
         <EditableField compact label="Title">
           <TextInput

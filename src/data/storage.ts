@@ -17,11 +17,11 @@ type RecipeRow = {
 };
 
 function getRecipeColor(source: string) {
-  if (source === 'TikTok') {
+  if (source.startsWith('TikTok')) {
     return '#F18F7A';
   }
 
-  if (source === 'Instagram') {
+  if (source.startsWith('Instagram')) {
     return '#0a18e9';
   }
 

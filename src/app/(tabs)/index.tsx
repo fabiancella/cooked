@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { getRecipeColor } from '@/lib/recipe-formatting';
 import { AppButton, Header, palette, RecipeCard, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 

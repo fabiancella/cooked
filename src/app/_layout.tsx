@@ -35,7 +35,15 @@ function AppContent() {
           contentStyle: { backgroundColor: '#FFF8F0' },
         }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="preview" options={{ presentation: 'card' }} />
+        <Stack.Screen
+          name="preview"
+          options={{
+            animation: 'slide_from_right',
+            fullScreenGestureEnabled: true,
+            gestureEnabled: true,
+            presentation: 'card',
+          }}
+        />
         <Stack.Screen name="recipe/[id]" />
         <Stack.Screen name="cooking/[id]" />
         <Stack.Screen name="settings/account" />
