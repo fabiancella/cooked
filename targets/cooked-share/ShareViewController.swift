@@ -2,11 +2,15 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class ShareViewController: UIViewController {
+  private let debugImportScreenOnly = false
   private let appGroupIdentifier = "group.com.fcella.cooked"
   private let pendingImportKey = "pendingSharedImport"
   private let creamColor = UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1.0)
   private let herbColor = UIColor(red: 0.255, green: 0.392, blue: 0.290, alpha: 1.0)
+  private let inkColor = UIColor(red: 0.165, green: 0.129, blue: 0.094, alpha: 1.0)
   private let lineColor = UIColor(red: 0.918, green: 0.863, blue: 0.796, alpha: 1.0)
+  private let mutedColor = UIColor(red: 0.490, green: 0.431, blue: 0.380, alpha: 1.0)
+  private let paperColor = UIColor.white
   private let sageColor = UIColor(red: 0.918, green: 0.945, blue: 0.910, alpha: 1.0)
   private let previewLabel = UILabel()
   private var contentStack: UIStackView?
@@ -14,6 +18,7 @@ final class ShareViewController: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    overrideUserInterfaceStyle = .light
     view.backgroundColor = creamColor
 
     log("extension launched")
@@ -103,6 +108,7 @@ final class ShareViewController: UIViewController {
     titleLabel.text = "Import to Cooked?"
     titleLabel.font = .systemFont(ofSize: 25, weight: .bold)
     titleLabel.adjustsFontForContentSizeCategory = true
+    titleLabel.textColor = inkColor
     titleLabel.textAlignment = .center
     titleLabel.numberOfLines = 0
 
@@ -110,7 +116,7 @@ final class ShareViewController: UIViewController {
     subtitleLabel.text = "Save this recipe link and Cooked will format it when you open the app."
     subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
     subtitleLabel.adjustsFontForContentSizeCategory = true
-    subtitleLabel.textColor = .secondaryLabel
+    subtitleLabel.textColor = mutedColor
     subtitleLabel.textAlignment = .center
     subtitleLabel.numberOfLines = 0
 
@@ -132,7 +138,7 @@ final class ShareViewController: UIViewController {
 
     let cardView = UIView()
     cardView.translatesAutoresizingMaskIntoConstraints = false
-    cardView.backgroundColor = .systemBackground
+    cardView.backgroundColor = paperColor
     cardView.layer.cornerRadius = 24
     cardView.layer.borderWidth = 1
     cardView.layer.borderColor = lineColor.cgColor
@@ -175,6 +181,13 @@ final class ShareViewController: UIViewController {
 
   @objc private func importTapped() {
     log("Import tapped")
+    showLoadingView(message: "Importing to Cooked...")
+
+    if debugImportScreenOnly {
+      log("debug import screen mode enabled; skipping save")
+      showDebugImportFlow()
+      return
+    }
 
     guard let sharedText, !sharedText.isEmpty else {
       log("no shared text to save")
@@ -212,7 +225,7 @@ final class ShareViewController: UIViewController {
     let iconLabel = UILabel()
     iconLabel.text = "✓"
     iconLabel.font = .systemFont(ofSize: 28, weight: .bold)
-    iconLabel.textColor = lineColor
+    iconLabel.textColor = herbColor
     iconLabel.textAlignment = .center
 
     let iconView = UIView()
@@ -226,6 +239,7 @@ final class ShareViewController: UIViewController {
     successLabel.text = message
     successLabel.font = .systemFont(ofSize: 19, weight: .bold)
     successLabel.adjustsFontForContentSizeCategory = true
+    successLabel.textColor = inkColor
     successLabel.textAlignment = .center
     successLabel.numberOfLines = 0
 
@@ -256,6 +270,53 @@ final class ShareViewController: UIViewController {
     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
       self?.finish()
     }
+  }
+
+  private func showDebugImportFlow() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+      self?.showSuccessView(message: "Debug import complete.")
+    }
+  }
+
+  private func showLoadingView(message: String) {
+    contentStack?.removeFromSuperview()
+
+    let activityIndicator = UIActivityIndicatorView(style: .large)
+    activityIndicator.color = herbColor
+    activityIndicator.startAnimating()
+
+    let loadingLabel = UILabel()
+    loadingLabel.text = message
+    loadingLabel.font = .systemFont(ofSize: 19, weight: .bold)
+    loadingLabel.adjustsFontForContentSizeCategory = true
+    loadingLabel.textColor = inkColor
+    loadingLabel.textAlignment = .center
+    loadingLabel.numberOfLines = 0
+
+    let helperLabel = UILabel()
+    helperLabel.text = "Testing the import screen without saving anything."
+    helperLabel.font = .preferredFont(forTextStyle: .subheadline)
+    helperLabel.adjustsFontForContentSizeCategory = true
+    helperLabel.textColor = mutedColor
+    helperLabel.textAlignment = .center
+    helperLabel.numberOfLines = 0
+
+    let contentStack = UIStackView(arrangedSubviews: [activityIndicator, loadingLabel, helperLabel])
+    contentStack.translatesAutoresizingMaskIntoConstraints = false
+    contentStack.axis = .vertical
+    contentStack.spacing = 14
+    contentStack.alignment = .center
+
+    view.addSubview(contentStack)
+    self.contentStack = contentStack
+
+    NSLayoutConstraint.activate([
+      contentStack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
+      contentStack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor),
+      contentStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+    ])
+
+    log("debug loading UI displayed")
   }
 
   private func finish() {
