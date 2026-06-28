@@ -7,6 +7,6 @@ module.exports = {
   deploymentTarget: '15.1',
   exportJs: false,
   entitlements: {
-    'com.apple.security.application-groups': ['group.com.fcella.cooked'],
+    'com.apple.security.application-groups': ['group.com.fabiancella.cooked'],
   },
 };

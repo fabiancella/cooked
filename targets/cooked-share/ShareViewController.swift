@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 final class ShareViewController: UIViewController {
   private let debugImportScreenOnly = false
-  private let appGroupIdentifier = "group.com.fcella.cooked"
+  private let appGroupIdentifier = "group.com.fabiancella.cooked"
   private let pendingImportKey = "pendingSharedImport"
   private let creamColor = UIColor(red: 1.0, green: 0.973, blue: 0.941, alpha: 1.0)
   private let herbColor = UIColor(red: 0.255, green: 0.392, blue: 0.290, alpha: 1.0)

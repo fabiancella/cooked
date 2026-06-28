@@ -9,11 +9,15 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.fcella.cooked",
+      "appleTeamId": "QKR7TMBHB4",
+      "bundleIdentifier": "com.fabiancella.cooked",
       "entitlements": {
         "com.apple.security.application-groups": [
-          "group.com.fcella.cooked"
+          "group.com.fabiancella.cooked"
         ]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -46,6 +50,29 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.fabiancella.cooked.share",
+                  "targetName": "CookedShare",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.fabiancella.cooked"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "31b99cfb-c50a-4a0d-bd71-bbb2193d8599"
+      }
     }
   }
 }
