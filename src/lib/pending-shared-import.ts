@@ -1,7 +1,7 @@
 import { ExtensionStorage } from '@bacons/apple-targets';
 import { Platform } from 'react-native';
 
-const APP_GROUP_IDENTIFIER = 'group.com.fcella.cooked';
+const APP_GROUP_IDENTIFIER = 'group.com.fabiancella.cooked';
 const PENDING_SHARED_IMPORT_KEY = 'pendingSharedImport';
 
 const storage = new ExtensionStorage(APP_GROUP_IDENTIFIER);

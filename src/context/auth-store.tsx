@@ -74,32 +74,48 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let isMounted = true;
+    let subscription: { unsubscribe: () => void } | null = null;
 
     async function loadSession() {
-      const { data, error: sessionError } = await supabase.auth.getSession();
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
 
-      if (!isMounted) {
-        return;
+        if (!isMounted) {
+          return;
+        }
+
+        if (sessionError) {
+          setError(getAuthErrorMessage(sessionError.message));
+        }
+
+        setSession(data.session);
+      } catch (sessionError) {
+        if (isMounted) {
+          setError(getAuthErrorMessage(sessionError));
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-
-      if (sessionError) {
-        setError(getAuthErrorMessage(sessionError.message));
-      }
-
-      setSession(data.session);
-      setLoading(false);
     }
 
     void loadSession();
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        setSession(nextSession);
+        setLoading(false);
+      });
+      subscription = data.subscription;
+    } catch (sessionError) {
+      setError(getAuthErrorMessage(sessionError));
       setLoading(false);
-    });
+    }
 
     return () => {
       isMounted = false;
-      data.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 

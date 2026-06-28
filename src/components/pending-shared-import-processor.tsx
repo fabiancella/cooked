@@ -53,7 +53,7 @@ export function PendingSharedImportProcessor() {
       router.replace({
         pathname: '/add',
         params: {
-          sharedText: isPendingImportUrl ? '' : pendingImport,
+          sharedText: pendingImport,
           importError: AUTO_IMPORT_FAILED_ERROR,
         },
       });

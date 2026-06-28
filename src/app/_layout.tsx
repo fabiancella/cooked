@@ -9,6 +9,32 @@ import { Header, palette, Screen } from '@/components/recipe-ui';
 import { AuthProvider, useAuth } from '@/context/auth-store';
 import { RecipeProvider } from '@/context/recipe-store';
 
+type RootErrorBoundaryState = {
+  error: Error | null;
+};
+
+class RootErrorBoundary extends React.Component<React.PropsWithChildren, RootErrorBoundaryState> {
+  state: RootErrorBoundaryState = {
+    error: null,
+  };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <Screen>
+          <Header eyebrow="Cooked" title="Something went wrong" subtitle={this.state.error.message} />
+        </Screen>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function AppContent() {
   const { loading, session } = useAuth();
 
@@ -59,9 +85,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <RootErrorBoundary>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </RootErrorBoundary>
     </ThemeProvider>
   );
 }
