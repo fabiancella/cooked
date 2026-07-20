@@ -175,13 +175,7 @@ export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () =>
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      {recipe.imageUrl ? (
-        <Image source={{ uri: recipe.imageUrl }} style={styles.cardImage} />
-      ) : (
-        <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
-          <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={palette.paper} />
-        </View>
-      )}
+      <RecipeCardImage recipe={recipe} />
       <View style={styles.cardBody}>
         <View style={styles.cardTitleRow}>
           <Text style={styles.cardTitle}>{recipe.title}</Text>
@@ -194,6 +188,31 @@ export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () =>
         </View>
       </View>
     </Pressable>
+  );
+}
+
+function RecipeCardImage({ recipe }: { recipe: Recipe }) {
+  const [imageFailed, setImageFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageFailed(false);
+  }, [recipe.imageUrl]);
+
+  if (!recipe.imageUrl || imageFailed) {
+    return (
+      <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
+        <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={palette.paper} />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      onError={() => setImageFailed(true)}
+      resizeMode="cover"
+      source={{ uri: recipe.imageUrl }}
+      style={styles.cardImage}
+    />
   );
 }
 
@@ -221,11 +240,24 @@ export function PlaceholderImage({ color = palette.butter }: { color?: string })
 }
 
 export function RecipeImage({ recipe }: { recipe: Recipe }) {
-  if (!recipe.imageUrl) {
+  const [imageFailed, setImageFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageFailed(false);
+  }, [recipe.imageUrl]);
+
+  if (!recipe.imageUrl || imageFailed) {
     return <PlaceholderImage color={recipe.color} />;
   }
 
-  return <Image source={{ uri: recipe.imageUrl }} style={styles.heroPhoto} />;
+  return (
+    <Image
+      onError={() => setImageFailed(true)}
+      resizeMode="cover"
+      source={{ uri: recipe.imageUrl }}
+      style={styles.heroPhoto}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -352,13 +384,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   imageBlock: {
-    height: 132,
+    height: 150,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardImage: {
     width: '100%',
-    height: 132,
+    height: 150,
   },
   cardBody: {
     padding: 16,
@@ -424,14 +456,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroImage: {
-    height: 170,
+    height: 220,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroPhoto: {
     width: '100%',
-    height: 170,
+    height: 220,
     borderRadius: 18,
   },
 });

@@ -9,6 +9,8 @@ const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_RETRY_STATUSES = [429, 500, 502, 503, 504];
 const GEMINI_RETRY_DELAYS_MS = [500, 1500, 3000];
+const RECIPE_IMAGE_BUCKET = 'recipe-images';
+const MAX_RECIPE_IMAGE_BYTES = 8 * 1024 * 1024;
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -290,6 +292,114 @@ function isHttpUrl(value: string) {
   return url?.protocol === 'http:' || url?.protocol === 'https:';
 }
 
+function getImageExtension(contentType: string) {
+  const cleanContentType = contentType.split(';')[0].trim().toLowerCase();
+
+  if (cleanContentType === 'image/jpeg' || cleanContentType === 'image/jpg') {
+    return 'jpg';
+  }
+
+  if (cleanContentType === 'image/png') {
+    return 'png';
+  }
+
+  if (cleanContentType === 'image/webp') {
+    return 'webp';
+  }
+
+  if (cleanContentType === 'image/gif') {
+    return 'gif';
+  }
+
+  return null;
+}
+
+async function cacheRecipeImage(imageUrl: string, requestId: string) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    logImport(requestId, 'recipe image cache skipped because Supabase service env is missing');
+    return null;
+  }
+
+  try {
+    logImport(requestId, 'requesting recipe image for cache', getUrlLogDetails(imageUrl));
+
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        Accept: 'image/avif,image/webp,image/png,image/jpeg,image/*,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (compatible; CookedRecipeImporter/1.0)',
+      },
+    });
+
+    const contentType = imageResponse.headers.get('content-type') ?? '';
+    const contentLength = Number(imageResponse.headers.get('content-length') ?? 0);
+
+    logImport(requestId, 'recipe image response received', {
+      status: imageResponse.status,
+      contentType,
+      contentLength,
+    });
+
+    if (!imageResponse.ok) {
+      return null;
+    }
+
+    const extension = getImageExtension(contentType);
+
+    if (!extension) {
+      logImport(requestId, 'recipe image cache skipped because response was not a supported image', { contentType });
+      return null;
+    }
+
+    if (contentLength > MAX_RECIPE_IMAGE_BYTES) {
+      logImport(requestId, 'recipe image cache skipped because image was too large', { contentLength });
+      return null;
+    }
+
+    const imageBytes = await imageResponse.arrayBuffer();
+
+    if (imageBytes.byteLength > MAX_RECIPE_IMAGE_BYTES) {
+      logImport(requestId, 'recipe image cache skipped because downloaded image was too large', {
+        byteLength: imageBytes.byteLength,
+      });
+      return null;
+    }
+
+    const filePath = `imports/${crypto.randomUUID()}.${extension}`;
+    const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/${RECIPE_IMAGE_BUCKET}/${filePath}`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+        'cache-control': '31536000',
+        'content-type': contentType,
+        'x-upsert': 'false',
+      },
+      body: imageBytes,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      logImport(requestId, 'recipe image cache upload failed', {
+        status: uploadResponse.status,
+        error: errorText.slice(0, 300),
+      });
+      return null;
+    }
+
+    const cachedImageUrl = `${supabaseUrl}/storage/v1/object/public/${RECIPE_IMAGE_BUCKET}/${filePath}`;
+    logImport(requestId, 'recipe image cached successfully', { cachedImageUrl });
+    return cachedImageUrl;
+  } catch (error) {
+    logImport(requestId, 'recipe image cache failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 function getUrlLogDetails(value: string) {
   const url = getParsedUrl(value);
 
@@ -530,6 +640,8 @@ async function getInstagramMetadata(url: string, requestId: string): Promise<Soc
   const ogDescription = getMetaContent(html, ['og:description']);
   const pageDescription = getMetaContent(html, ['description']);
   const twitterDescription = getMetaContent(html, ['twitter:description']);
+  const ogImage = getMetaContent(html, ['og:image', 'og:image:secure_url']);
+  const twitterImage = getMetaContent(html, ['twitter:image', 'twitter:image:src']);
 
   logImport(requestId, 'Instagram metadata HTML parsed', {
     htmlLength: html.length,
@@ -541,19 +653,23 @@ async function getInstagramMetadata(url: string, requestId: string): Promise<Soc
     hasOgDescription: Boolean(ogDescription),
     hasPageDescription: Boolean(pageDescription),
     hasTwitterDescription: Boolean(twitterDescription),
+    hasOgImage: Boolean(ogImage),
+    hasTwitterImage: Boolean(twitterImage),
   });
 
-  const metadata = {
+  const metadata: SocialMetadata = {
     authorName: getInstagramAuthorName(ogTitle ?? twitterTitle ?? pageTitle) ?? undefined,
     providerName: 'Instagram',
     title: ogTitle ?? twitterTitle ?? pageTitle,
     description: ogDescription ?? pageDescription ?? twitterDescription,
+    imageUrl: ogImage ?? twitterImage,
   };
 
   logImport(requestId, 'Instagram metadata parsed', {
     hasTitle: Boolean(metadata.title),
     hasDescription: Boolean(metadata.description),
     hasAuthor: Boolean(metadata.authorName),
+    hasImage: Boolean(metadata.imageUrl),
     titleLength: metadata.title?.length ?? 0,
     descriptionLength: metadata.description?.length ?? 0,
   });
@@ -746,7 +862,8 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
     throw new RecipeValidationError();
   }
 
-  const formattedRecipe = validateRecipe(result.recipe, text, metadata?.imageUrl, socialSource);
+  const cachedImageUrl = metadata?.imageUrl ? await cacheRecipeImage(metadata.imageUrl, requestId) : null;
+  const formattedRecipe = validateRecipe(result.recipe, text, cachedImageUrl ?? undefined, socialSource);
 
   if (!formattedRecipe) {
     logImport(requestId, 'formatted recipe failed validation', {
@@ -762,6 +879,7 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
     importMode,
     isInstagram: isInstagramImport,
     hasMetadata: Boolean(metadata),
+    hasSourceImage: Boolean(metadata?.imageUrl),
     hasImage: Boolean(formattedRecipe.imageUrl),
     ingredientCount: formattedRecipe.ingredients.length,
     stepCount: formattedRecipe.steps.length,
