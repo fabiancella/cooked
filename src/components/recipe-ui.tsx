@@ -148,7 +148,6 @@ export function KeyboardDoneAccessory() {
         accessibilityLabel="Dismiss keyboard"
         onPress={Keyboard.dismiss}
         style={({ pressed }) => [styles.keyboardDoneButton, pressed && styles.pressed]}>
-        <SymbolView name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' }} size={34} tintColor="#007AFF" />
       </Pressable>
     </View>
   );
