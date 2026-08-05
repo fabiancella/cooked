@@ -1,11 +1,13 @@
 import { SymbolView } from 'expo-symbols';
 import React, { PropsWithChildren } from 'react';
 import {
+  Alert,
   Image,
   Keyboard,
   Platform,
   Pressable,
   PressableProps,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -256,6 +258,50 @@ export function RecipeImage({ recipe }: { recipe: Recipe }) {
       source={{ uri: recipe.imageUrl }}
       style={styles.heroPhoto}
     />
+  );
+}
+
+function getExternalUrl(value?: string | null) {
+  const urlMatch = value?.match(/https?:\/\/\S+/);
+  const url = urlMatch?.[0]?.replace(/[),.]+$/, '');
+
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' ? parsedUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function ExternalUrl({ label = 'View original video', url }: { label?: string; url?: string | null }) {
+  const externalUrl = getExternalUrl(url);
+
+  if (!externalUrl) {
+    return null;
+  }
+
+  const openExternalUrl = async () => {
+    const canOpenUrl = await Linking.canOpenURL(externalUrl);
+
+    if (!canOpenUrl) {
+      Alert.alert('Could not open link', 'This source link is not available on this device.');
+      return;
+    }
+
+    await Linking.openURL(externalUrl);
+  };
+
+  return (
+    <AppButton
+      variant="secondary"
+      onPress={openExternalUrl}
+      icon={{ ios: 'arrow.up.right.square', android: 'open_in_new', web: 'open_in_new' }}>
+      {label}
+    </AppButton>
   );
 }
 

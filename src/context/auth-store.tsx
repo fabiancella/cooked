@@ -1,9 +1,9 @@
-import { Session, User } from '@supabase/supabase-js';
+import { FunctionsHttpError, Session, User } from '@supabase/supabase-js';
 import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
-type AuthAction = 'idle' | 'signing-in' | 'signing-up' | 'signing-out';
+type AuthAction = 'idle' | 'signing-in' | 'signing-up' | 'signing-out' | 'deleting-account';
 
 type SignUpResult = {
   success: boolean;
@@ -19,6 +19,7 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
   signOut: () => Promise<boolean>;
+  deleteAccount: (password: string) => Promise<boolean>;
   clearError: () => void;
 };
 
@@ -60,6 +61,22 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   return 'Something went wrong. Please try again.';
+}
+
+async function getFunctionErrorMessage(error: unknown) {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = (await error.context.json()) as { error?: unknown };
+
+      if (typeof body.error === 'string') {
+        return body.error;
+      }
+    } catch {
+      return 'Could not delete your account. Please try again.';
+    }
+  }
+
+  return getAuthErrorMessage(error);
 }
 
 export function getNormalizedAuthError(error: unknown){
@@ -196,6 +213,38 @@ export function AuthProvider({ children }: PropsWithChildren) {
           return true;
         } catch (signOutError) {
           setError(getAuthErrorMessage(signOutError));
+          return false;
+        } finally {
+          setAction('idle');
+        }
+      },
+      deleteAccount: async (password) => {
+        setError(null);
+        setAction('deleting-account');
+
+        try {
+          const { data, error: deleteError } = await supabase.functions.invoke<{ success?: boolean }>(
+            'delete-account',
+            {
+              body: { password },
+            },
+          );
+
+          if (deleteError) {
+            setError(await getFunctionErrorMessage(deleteError));
+            return false;
+          }
+
+          if (data?.success !== true) {
+            setError('Could not delete your account. Please try again.');
+            return false;
+          }
+
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+          return true;
+        } catch (deleteError) {
+          setError(await getFunctionErrorMessage(deleteError));
           return false;
         } finally {
           setAction('idle');

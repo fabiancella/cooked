@@ -2,6 +2,12 @@
 
 Cooked is an Expo React Native app for saving recipes from messy text, social captions, and notes. The app uses a Supabase Edge Function with Gemini to turn pasted recipe text into clean recipe cards, then saves those recipes to Supabase for the logged-in user.
 
+## Try Cooked
+
+[Join the Cooked iOS TestFlight Beta](https://testflight.apple.com/join/ACZQGBTR)
+
+Requires an iPhone with TestFlight installed.
+
 ## Features
 
 - Supabase Auth sign up, login, logout, and session persistence

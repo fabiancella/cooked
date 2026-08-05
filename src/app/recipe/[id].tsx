@@ -3,7 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, BackButton, Header, palette, RecipeImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, ExternalUrl, Header, palette, RecipeImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
 
 function isIngredientHeading(ingredient: string) {
@@ -128,6 +128,7 @@ export default function RecipeDetailScreen() {
 
       <View style={styles.actions}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <ExternalUrl url={recipe.sourceText} />
         <AppButton onPress={() => router.push({ pathname: '/cooking/[id]', params: { id: recipe.id } })} icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}>
           Start Cooking
         </AppButton>
