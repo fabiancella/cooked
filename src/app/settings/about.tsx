@@ -18,7 +18,7 @@ export default function AboutScreen() {
         <Text style={styles.description}>
           Cooked helps you turn pasted recipe text and social captions into clean, editable recipes.
         </Text>
-        <Text style={styles.version}>Version 1.0.1</Text>
+        <Text style={styles.version}>Version 1.0.2</Text>
       </View>
     </Screen>
   );

@@ -170,10 +170,8 @@ Beta limitations:
 ## Not Built Yet
 
 - Screenshot upload
-- Image storage
 - Export recipes
 - Payments or subscriptions
-- Account deletion
 - App Store setup
 
 ## Security Notes
