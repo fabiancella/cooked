@@ -8,24 +8,60 @@ import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 export function AuthScreen() {
   const { colors } = useAppTheme();
   const styles = useThemeStyles(createStyles);
-  const { action, clearError, error, signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const { action, clearError, error, requestPasswordReset, signIn, signUp } = useAuth();
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot-password'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-  const isSubmitting = action === 'signing-in' || action === 'signing-up';
+  const isSubmitting =
+    action === 'signing-in' ||
+    action === 'signing-up' ||
+    action === 'requesting-password-reset';
+
+  const title =
+    mode === 'login'
+      ? 'Log in'
+      : mode === 'signup'
+        ? 'Create account'
+        : 'Reset password';
+
+  const subtitle =
+    mode === 'forgot-password'
+      ? 'Enter your account email to receive a reset link.'
+      : 'Sign in to save recipes to your account.';
 
   const buttonText =
     action === 'signing-in'
       ? 'Logging in...'
       : action === 'signing-up'
         ? 'Creating account...'
-        : mode === 'login'
-          ? 'Log In'
-          : 'Sign Up';
+        : action === 'requesting-password-reset'
+          ? 'Sending reset link...'
+          : mode === 'forgot-password'
+            ? 'Send Reset Link'
+            : mode === 'login'
+              ? 'Log In'
+              : 'Sign Up';
+
+  const changeMode = (nextMode: 'login' | 'signup' | 'forgot-password') => {
+    setMode(nextMode);
+    setPassword('');
+    setMessage(null);
+    clearError();
+  };
 
   const submit = async () => {
     setMessage(null);
+
+    if (mode === 'forgot-password') {
+      const success = await requestPasswordReset(email.trim());
+
+      if (success) {
+        setMessage('If an account exists for this email, a password reset link has been sent.');
+      }
+
+      return;
+    }
 
     if (mode === 'login') {
       await signIn(email.trim(), password);
@@ -44,8 +80,8 @@ export function AuthScreen() {
     <Screen>
       <Header
         eyebrow="Cooked"
-        title={mode === 'login' ? 'Log in' : 'Create account'}
-        subtitle="Sign in to save recipes to your account."
+        title={title}
+        subtitle={subtitle}
       />
 
       <View style={styles.panel}>
@@ -61,30 +97,39 @@ export function AuthScreen() {
           style={styles.input}
         />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.muted}
-          style={styles.input}
-        />
+        {mode !== 'forgot-password' ? (
+          <>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Password"
+              placeholderTextColor={colors.muted}
+              style={styles.input}
+            />
+          </>
+        ) : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         {message ? <Text style={styles.messageText}>{message}</Text> : null}
 
-        <AppButton onPress={submit} disabled={isSubmitting || !email || !password}>
-          {buttonText}
-        </AppButton> 
         <AppButton
-          variant="secondary"
-          onPress={() => {
-            setMode((current) => (current === 'login' ? 'signup' : 'login'));
-            setMessage(null);
-            clearError();
-          }}>
-          {mode === 'login' ? 'Create Account' : 'Already Have Account'}
+          onPress={submit}
+          disabled={isSubmitting || !email || (mode !== 'forgot-password' && !password)}>
+          {buttonText}
+        </AppButton>
+
+        {mode === 'login' ? (
+          <AppButton variant="ghost" onPress={() => changeMode('forgot-password')}>
+            Forgot Password?
+          </AppButton>
+        ) : null}
+
+        <AppButton variant="secondary" onPress={() => changeMode(mode === 'login' ? 'signup' : 'login')}>
+          {mode === 'login' ? 'Create Account' : 'Back to Login'}
         </AppButton>
       </View>
     </Screen>

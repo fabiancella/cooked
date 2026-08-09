@@ -24,3 +24,17 @@ export const supabase = createClient(
   },
   },
 );
+
+export function createTemporarySupabaseClient() {
+  return createClient(
+    supabaseUrl ?? fallbackSupabaseUrl,
+    supabaseAnonKey ?? fallbackSupabaseAnonKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+}

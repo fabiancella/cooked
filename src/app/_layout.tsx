@@ -5,6 +5,7 @@ import { ActivityIndicator, StatusBar, Text } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { PendingSharedImportProcessor } from '@/components/pending-shared-import-processor';
+import { PasswordRecoveryScreen } from '@/components/password-recovery-screen';
 import { Header, Screen } from '@/components/recipe-ui';
 import { AuthProvider, useAuth } from '@/context/auth-store';
 import { RecipeProvider } from '@/context/recipe-store';
@@ -37,7 +38,7 @@ class RootErrorBoundary extends React.Component<React.PropsWithChildren, RootErr
 }
 
 function AppContent() {
-  const { loading, session } = useAuth();
+  const { loading, passwordRecoveryStatus, session } = useAuth();
   const { colors } = useAppTheme();
 
   if (loading) {
@@ -48,6 +49,10 @@ function AppContent() {
         <Text style={{ color: colors.muted, fontWeight: '700' }}>Preparing your recipe box...</Text>
       </Screen>
     );
+  }
+
+  if (passwordRecoveryStatus !== 'idle') {
+    return <PasswordRecoveryScreen />;
   }
 
   if (!session) {

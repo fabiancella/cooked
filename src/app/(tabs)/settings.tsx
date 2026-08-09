@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { AppButton, Header, Screen } from '@/components/recipe-ui';
 import { useAuth } from '@/context/auth-store';
@@ -26,6 +26,17 @@ export default function SettingsScreen() {
   const { colors, isDark, setDarkMode } = useAppTheme();
   const styles = useThemeStyles(createStyles);
   const isSigningOut = action === 'signing-out';
+
+  const confirmSignOut = () => {
+    Alert.alert(
+      'Log out?',
+      'You will need to log in again to access your saved recipes.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: signOut },
+      ],
+    );
+  };
 
   return (
     <Screen bottomPadding={24}>
@@ -66,7 +77,7 @@ export default function SettingsScreen() {
         ))}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <AppButton disabled={isSigningOut} variant="danger" onPress={signOut}>
+      <AppButton disabled={isSigningOut} variant="danger" onPress={confirmSignOut}>
         {isSigningOut ? 'Logging out...' : 'Log Out'}
       </AppButton>
     </Screen>

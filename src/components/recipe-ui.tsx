@@ -33,7 +33,13 @@ type ScreenProps = PropsWithChildren<{
   bottomPadding?: number;
 }>;
 
-export function Screen({ children, scroll = true, scrollEnabled = true, contentStyle, bottomPadding = 32 }: ScreenProps) {
+export function Screen({
+  children,
+  scroll = true,
+  scrollEnabled = true,
+  contentStyle,
+  bottomPadding = 32,
+}: ScreenProps) {
   const { styles } = useRecipeUiTheme();
   const contentStyles = [styles.content, { paddingBottom: bottomPadding }, contentStyle];
 

@@ -1,18 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton, BackButton, ExternalUrl, Header, RecipeImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
@@ -21,12 +11,15 @@ import { getScaledServingLabel, getServingCount, scaleIngredients } from '@/lib/
 
 const MIN_SERVINGS = 1;
 const MAX_SERVINGS = 100;
+const STICKY_ACTION_TOP_PADDING = 12;
+const STICKY_ACTION_BUTTON_HEIGHT = 52;
 
 function isIngredientHeading(ingredient: string) {
   return /^[^:]{2,45}:$/.test(ingredient.trim());
 }
 
 export default function RecipeDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const styles = useThemeStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,10 +29,6 @@ export default function RecipeDetailScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [checkedIngredientIndexes, setCheckedIngredientIndexes] = useState<Set<number>>(() => new Set());
   const [selectedServingCount, setSelectedServingCount] = useState(originalServingCount ?? MIN_SERVINGS);
-  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
-  const [sectionPagerWidth, setSectionPagerWidth] = useState(0);
-  const [sectionHeights, setSectionHeights] = useState<[number, number]>([0, 0]);
-  const sectionPagerRef = useRef<ScrollView>(null);
 
   const displayedIngredients = useMemo(
     () => scaleIngredients(recipe?.ingredients ?? [], originalServingCount ?? MIN_SERVINGS, selectedServingCount),
@@ -50,60 +39,13 @@ export default function RecipeDetailScreen() {
       ? getScaledServingLabel(recipe.servings, selectedServingCount)
       : recipe.servings
     : '';
-  const activeSectionHeight = sectionHeights[activeSectionIndex] || undefined;
+  const stickyActionBottomPadding = Math.max(insets.bottom, 12);
+  const stickyActionHeight = STICKY_ACTION_TOP_PADDING + STICKY_ACTION_BUTTON_HEIGHT + stickyActionBottomPadding;
 
   useEffect(() => {
     setCheckedIngredientIndexes(new Set());
     setSelectedServingCount(originalServingCount ?? MIN_SERVINGS);
-    setActiveSectionIndex(0);
-    setSectionHeights([0, 0]);
-    sectionPagerRef.current?.scrollTo({ x: 0, animated: false });
   }, [originalServingCount, recipe?.id]);
-
-  const updateSectionHeight = (index: number, height: number) => {
-    setSectionHeights((currentHeights) => {
-      if (currentHeights[index] === height) {
-        return currentHeights;
-      }
-
-      return index === 0
-        ? [height, currentHeights[1]]
-        : [currentHeights[0], height];
-    });
-  };
-
-  const handlePagerLayout = (event: LayoutChangeEvent) => {
-    const nextWidth = event.nativeEvent.layout.width;
-
-    if (nextWidth === sectionPagerWidth) {
-      return;
-    }
-
-    setSectionPagerWidth(nextWidth);
-    requestAnimationFrame(() => {
-      sectionPagerRef.current?.scrollTo({
-        x: activeSectionIndex * nextWidth,
-        animated: false,
-      });
-    });
-  };
-
-  const handleSectionSwipe = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!sectionPagerWidth) {
-      return;
-    }
-
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / sectionPagerWidth);
-    setActiveSectionIndex(Math.max(0, Math.min(nextIndex, 1)));
-  };
-
-  const showSection = (index: number) => {
-    setActiveSectionIndex(index);
-    sectionPagerRef.current?.scrollTo({
-      x: index * sectionPagerWidth,
-      animated: true,
-    });
-  };
 
   const toggleIngredientChecked = (index: number) => {
     setCheckedIngredientIndexes((currentIndexes) => {
@@ -158,185 +100,132 @@ export default function RecipeDetailScreen() {
     );
   }
 
-  return (
-    <Screen>
-      <BackButton onPress={() => router.dismissTo('/')} label="Recipes" />
-      <Header eyebrow={recipe.source} title={recipe.title} subtitle={`${recipe.cookTime} • ${displayedServingLabel}`} />
-      <RecipeImage recipe={recipe} />
-
-      <View accessibilityRole="tablist" style={styles.sectionTabs}>
-        {['Ingredients', 'Steps'].map((label, index) => {
-          const isActive = activeSectionIndex === index;
-
-          return (
-            <Pressable
-              key={label}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              onPress={() => showSection(index)}
-              style={({ pressed }) => [
-                styles.sectionTab,
-                isActive && styles.activeSectionTab,
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[styles.sectionTabText, isActive && styles.activeSectionTabText]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View onLayout={handlePagerLayout} style={styles.sectionPagerContainer}>
-        {sectionPagerWidth > 0 ? (
-          <ScrollView
-            ref={sectionPagerRef}
-            horizontal
-            pagingEnabled
-            bounces={false}
-            nestedScrollEnabled
-            directionalLockEnabled
-            decelerationRate="fast"
-            overScrollMode="never"
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleSectionSwipe}
-            contentContainerStyle={styles.sectionPagerContent}
-            style={{ height: activeSectionHeight }}>
-            <View
-              onLayout={(event) => updateSectionHeight(0, event.nativeEvent.layout.height)}
-              style={[styles.section, { width: sectionPagerWidth }]}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Ingredients</Text>
-                {originalServingCount ? (
-                  <View style={styles.servingControl}>
-                    <Text style={styles.servingLabel}>Servings</Text>
-                    <View style={styles.servingStepper}>
-                      <Pressable
-                        accessibilityLabel="Decrease servings"
-                        disabled={selectedServingCount <= MIN_SERVINGS}
-                        onPress={() => setSelectedServingCount((current) => Math.max(current - 1, MIN_SERVINGS))}
-                        style={({ pressed }) => [
-                          styles.servingButton,
-                          selectedServingCount <= MIN_SERVINGS && styles.disabledServingButton,
-                          pressed && styles.pressed,
-                        ]}>
-                        <SymbolView name={{ ios: 'minus', android: 'remove', web: 'remove' }} size={17} tintColor={colors.herb} />
-                      </Pressable>
-                      <Text style={styles.servingCount}>{selectedServingCount}</Text>
-                      <Pressable
-                        accessibilityLabel="Increase servings"
-                        disabled={selectedServingCount >= MAX_SERVINGS}
-                        onPress={() => setSelectedServingCount((current) => Math.min(current + 1, MAX_SERVINGS))}
-                        style={({ pressed }) => [
-                          styles.servingButton,
-                          selectedServingCount >= MAX_SERVINGS && styles.disabledServingButton,
-                          pressed && styles.pressed,
-                        ]}>
-                        <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={17} tintColor={colors.herb} />
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-              {displayedIngredients.map((ingredient, index) => {
-                if (isIngredientHeading(ingredient)) {
-                  return <Text key={`${ingredient}-${index}`} style={styles.ingredientHeading}>{ingredient}</Text>;
-                }
-
-                const isChecked = checkedIngredientIndexes.has(index);
-
-                return (
-                  <Pressable
-                    key={`${ingredient}-${index}`}
-                    accessibilityLabel={isChecked ? 'Uncheck ingredient' : 'Check ingredient'}
-                    onPress={() => toggleIngredientChecked(index)}
-                    style={({ pressed }) => [styles.ingredientRow, pressed && styles.pressed]}>
-                    <View style={styles.ingredientCheckButton}>
-                      <SymbolView
-                        name={{
-                          ios: isChecked ? 'checkmark.circle.fill' : 'circle',
-                          android: isChecked ? 'check_circle' : 'radio_button_unchecked',
-                          web: isChecked ? 'check_circle' : 'circle',
-                        }}
-                        size={22}
-                        tintColor={isChecked ? colors.checkmark : colors.muted}
-                      />
-                    </View>
-                    <Text style={[styles.bodyText, isChecked && styles.checkedIngredientText]}>{ingredient}</Text>
-                  </Pressable>
-                );
-              })}
+  const renderIngredientsSection = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Ingredients</Text>
+        {originalServingCount ? (
+          <View style={styles.servingControl}>
+            <Text style={styles.servingLabel}>Servings</Text>
+            <View style={styles.servingStepper}>
+              <Pressable
+                accessibilityLabel="Decrease servings"
+                disabled={selectedServingCount <= MIN_SERVINGS}
+                onPress={() => setSelectedServingCount((current) => Math.max(current - 1, MIN_SERVINGS))}
+                style={({ pressed }) => [
+                  styles.servingButton,
+                  selectedServingCount <= MIN_SERVINGS && styles.disabledServingButton,
+                  pressed && styles.pressed,
+                ]}>
+                <SymbolView name={{ ios: 'minus', android: 'remove', web: 'remove' }} size={17} tintColor={colors.herb} />
+              </Pressable>
+              <Text style={styles.servingCount}>{selectedServingCount}</Text>
+              <Pressable
+                accessibilityLabel="Increase servings"
+                disabled={selectedServingCount >= MAX_SERVINGS}
+                onPress={() => setSelectedServingCount((current) => Math.min(current + 1, MAX_SERVINGS))}
+                style={({ pressed }) => [
+                  styles.servingButton,
+                  selectedServingCount >= MAX_SERVINGS && styles.disabledServingButton,
+                  pressed && styles.pressed,
+                ]}>
+                <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={17} tintColor={colors.herb} />
+              </Pressable>
             </View>
-
-            <View
-              onLayout={(event) => updateSectionHeight(1, event.nativeEvent.layout.height)}
-              style={[styles.section, { width: sectionPagerWidth }]}>
-              <Text style={styles.sectionTitle}>Steps</Text>
-              <View style={styles.stepList}>
-                {recipe.steps.map((step, index) => (
-                  <View key={`${step}-${index}`} style={styles.stepRow}>
-                    <Text style={styles.stepNumber}>{index + 1}</Text>
-                    <View style={styles.stepTextBox}>
-                      <Text style={styles.stepText}>{step}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </ScrollView>
+          </View>
         ) : null}
       </View>
+      {displayedIngredients.map((ingredient, index) => {
+        if (isIngredientHeading(ingredient)) {
+          return <Text key={`${ingredient}-${index}`} style={styles.ingredientHeading}>{ingredient}</Text>;
+        }
 
-      <View style={styles.actions}>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <ExternalUrl url={recipe.sourceText} />
-        <AppButton onPress={() => router.push({ pathname: '/cooking/[id]', params: { id: recipe.id } })} icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}>
-          Start Cooking
-        </AppButton>
-        <AppButton
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/preview', params: { id: recipe.id } })}
-          icon={{ ios: 'pencil', android: 'edit', web: 'edit' }}>
-          Edit
-        </AppButton>
-        <AppButton disabled={isDeleting} variant="danger" onPress={confirmDelete} icon={{ ios: 'trash', android: 'delete', web: 'delete' }}>
-          {isDeleting ? 'Deleting...' : 'Delete'}
-        </AppButton>
+        const isChecked = checkedIngredientIndexes.has(index);
+
+        return (
+          <Pressable
+            key={`${ingredient}-${index}`}
+            accessibilityLabel={isChecked ? 'Uncheck ingredient' : 'Check ingredient'}
+            onPress={() => toggleIngredientChecked(index)}
+            style={({ pressed }) => [styles.ingredientRow, pressed && styles.pressed]}>
+            <View style={styles.ingredientCheckButton}>
+              <SymbolView
+                name={{
+                  ios: isChecked ? 'checkmark.circle.fill' : 'circle',
+                  android: isChecked ? 'check_circle' : 'radio_button_unchecked',
+                  web: isChecked ? 'check_circle' : 'circle',
+                }}
+                size={22}
+                tintColor={isChecked ? colors.checkmark : colors.muted}
+              />
+            </View>
+            <Text style={[styles.bodyText, isChecked && styles.checkedIngredientText]}>{ingredient}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderStepsSection = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Steps</Text>
+      <View style={styles.stepList}>
+        {recipe.steps.map((step, index) => (
+          <View key={`${step}-${index}`} style={styles.stepRow}>
+            <Text style={styles.stepNumber}>{index + 1}</Text>
+            <View style={styles.stepTextBox}>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          </View>
+        ))}
       </View>
-    </Screen>
+    </View>
+  );
+
+  const renderSecondaryActions = () => (
+    <View style={styles.actions}>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      <ExternalUrl url={recipe.sourceText} />
+      <AppButton
+        variant="secondary"
+        onPress={() => router.push({ pathname: '/preview', params: { id: recipe.id } })}
+        icon={{ ios: 'pencil', android: 'edit', web: 'edit' }}>
+        Edit
+      </AppButton>
+      <AppButton disabled={isDeleting} variant="danger" onPress={confirmDelete} icon={{ ios: 'trash', android: 'delete', web: 'delete' }}>
+        {isDeleting ? 'Deleting...' : 'Delete'}
+      </AppButton>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <Screen bottomPadding={stickyActionHeight + 32}>
+        <BackButton onPress={() => router.dismissTo('/')} label="Recipes" />
+        <Header eyebrow={recipe.source} title={recipe.title} subtitle={`${recipe.cookTime} • ${displayedServingLabel}`} />
+        <RecipeImage recipe={recipe} />
+        {renderIngredientsSection()}
+        {renderStepsSection()}
+        {renderSecondaryActions()}
+      </Screen>
+
+      <View style={[styles.stickyActionBar, { paddingBottom: stickyActionBottomPadding }]}>
+        <View style={styles.stickyActionContent}>
+          <AppButton
+            onPress={() => router.push({ pathname: '/cooking/[id]', params: { id: recipe.id } })}
+            icon={{ ios: 'play.fill', android: 'play_arrow', web: 'play_arrow' }}>
+            Start Cooking
+          </AppButton>
+        </View>
+      </View>
+    </View>
   );
 }
 
 const createStyles = (palette: AppPalette) => StyleSheet.create({
-  sectionTabs: {
-    width: '100%',
-    height: 44,
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: palette.line,
-  },
-  sectionTab: {
+  screen: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  activeSectionTab: {
-    borderBottomColor: palette.herb,
-  },
-  sectionTabText: {
-    color: palette.muted,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  activeSectionTabText: {
-    color: palette.herb,
-  },
-  sectionPagerContainer: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  sectionPagerContent: {
-    alignItems: 'flex-start',
+    backgroundColor: palette.cream,
   },
   section: {
     backgroundColor: palette.paper,
@@ -461,6 +350,23 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  stickyActionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    borderTopWidth: 1,
+    borderTopColor: palette.line,
+    backgroundColor: palette.cream,
+    paddingTop: STICKY_ACTION_TOP_PADDING,
+  },
+  stickyActionContent: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
   },
   pressed: {
     opacity: 0.72,

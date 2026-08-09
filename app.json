@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cooked",
     "slug": "cooked",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cooked",
@@ -11,7 +11,7 @@
       "icon": "./assets/images/icon.png",
       "appleTeamId": "QKR7TMBHB4",
       "bundleIdentifier": "com.fabiancella.cooked",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.fabiancella.cooked"

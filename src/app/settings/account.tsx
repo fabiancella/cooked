@@ -9,27 +9,107 @@ import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 export default function AccountScreen() {
   const { colors } = useAppTheme();
   const styles = useThemeStyles(createStyles);
-  const { action, clearError, deleteAccount, error, user } = useAuth();
+  const {
+    action,
+    changePassword,
+    clearError,
+    deleteAccount,
+    error,
+    keepPasswordChangeSession,
+    signOutAllAfterPasswordChange,
+    user,
+  } = useAuth();
+  const [showChangeForm, setShowChangeForm] = useState(false);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
-  const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [changeValidationError, setChangeValidationError] = useState<string | null>(null);
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const isDeleting = action === 'deleting-account';
+  const isChangingPassword = action === 'changing-password';
+  const isSigningOutAll = action === 'signing-out-all';
+  const isBusy = isDeleting || isChangingPassword || isSigningOutAll;
+
+  const clearChangeForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangeValidationError(null);
+    setPasswordChanged(false);
+  };
+
+  const openChangeForm = () => {
+    clearError();
+    setDeletePassword('');
+    setShowDeleteForm(false);
+    clearChangeForm();
+    setShowChangeForm(true);
+  };
+
+  const cancelChange = () => {
+    clearError();
+    clearChangeForm();
+    setShowChangeForm(false);
+  };
+
+  const submitChange = async () => {
+    clearError();
+    setChangeValidationError(null);
+
+    if (newPassword !== confirmPassword) {
+      setChangeValidationError('New passwords do not match.');
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setChangeValidationError('New password must be different from the current password.');
+      return;
+    }
+
+    const success = await changePassword(currentPassword, newPassword);
+
+    if (success) {
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordChanged(true);
+    }
+  };
+
+  const keepCurrentSessions = () => {
+    keepPasswordChangeSession();
+    clearChangeForm();
+    setShowChangeForm(false);
+  };
+
+  const signOutAll = async () => {
+    const success = await signOutAllAfterPasswordChange();
+
+    if (success) {
+      router.replace('/');
+    }
+  };
 
   const openDeleteForm = () => {
     clearError();
+    clearChangeForm();
+    setShowChangeForm(false);
     setShowDeleteForm(true);
   };
 
   const cancelDelete = () => {
     clearError();
-    setPassword('');
+    setDeletePassword('');
     setShowDeleteForm(false);
   };
 
   const submitDelete = async () => {
-    const success = await deleteAccount(password);
+    const success = await deleteAccount(deletePassword);
 
     if (!success) {
-      setPassword('');
+      setDeletePassword('');
     }
   };
 
@@ -59,7 +139,7 @@ export default function AccountScreen() {
     <Screen>
       <BackButton
         onPress={() => {
-          if (!isDeleting) {
+          if (!isBusy) {
             router.back();
           }
         }}
@@ -72,6 +152,95 @@ export default function AccountScreen() {
         <Text style={styles.email}>{user?.email ?? 'Unknown email'}</Text>
       </View>
 
+      <View style={styles.passwordSection}>
+        <Text style={styles.sectionTitle}>Password</Text>
+        <Text style={styles.note}>Update the password used to log in to your account.</Text>
+
+        {showChangeForm ? (
+          passwordChanged ? (
+            <>
+              <Text style={styles.successText}>Your password has been changed.</Text>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <AppButton disabled={isSigningOutAll} variant="secondary" onPress={keepCurrentSessions}>
+                Don&apos;t Sign Out
+              </AppButton>
+              <AppButton
+                disabled={isSigningOutAll}
+                variant="danger"
+                onPress={() => void signOutAll()}>
+                {isSigningOutAll ? 'Signing out...' : 'Sign Out of All Devices'}
+              </AppButton>
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Current password</Text>
+              <TextInput
+                value={currentPassword}
+                onChangeText={(value) => {
+                  setCurrentPassword(value);
+                  setChangeValidationError(null);
+                }}
+                editable={!isChangingPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Current password"
+                placeholderTextColor={colors.muted}
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>New password</Text>
+              <TextInput
+                value={newPassword}
+                onChangeText={(value) => {
+                  setNewPassword(value);
+                  setChangeValidationError(null);
+                }}
+                editable={!isChangingPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="New password"
+                placeholderTextColor={colors.muted}
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>Confirm new password</Text>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={(value) => {
+                  setConfirmPassword(value);
+                  setChangeValidationError(null);
+                }}
+                editable={!isChangingPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Confirm new password"
+                placeholderTextColor={colors.muted}
+                style={styles.input}
+              />
+
+              {changeValidationError ? <Text style={styles.errorText}>{changeValidationError}</Text> : null}
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <AppButton variant="secondary" disabled={isChangingPassword} onPress={cancelChange}>
+                Cancel
+              </AppButton>
+              <AppButton
+                disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                onPress={submitChange}>
+                {isChangingPassword ? 'Changing password...' : 'Change Password'}
+              </AppButton>
+            </>
+          )
+        ) : (
+          <AppButton disabled={isBusy} variant="secondary" onPress={openChangeForm}>
+            Change Password
+          </AppButton>
+        )}
+      </View>
+
       <View style={styles.dangerSection}>
         <Text style={styles.dangerTitle}>Delete account</Text>
         <Text style={styles.note}>Permanently delete your account, saved recipes, and associated information.</Text>
@@ -80,8 +249,8 @@ export default function AccountScreen() {
           <>
             <Text style={styles.label}>Current password</Text>
             <TextInput
-              value={password}
-              onChangeText={setPassword}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
               editable={!isDeleting}
               secureTextEntry
               autoCapitalize="none"
@@ -96,12 +265,12 @@ export default function AccountScreen() {
             <AppButton variant="secondary" disabled={isDeleting} onPress={cancelDelete}>
               Cancel
             </AppButton>
-            <AppButton variant="danger" disabled={isDeleting || !password} onPress={confirmDelete}>
+            <AppButton variant="danger" disabled={isDeleting || !deletePassword} onPress={confirmDelete}>
               {isDeleting ? 'Deleting account...' : 'Continue'}
             </AppButton>
           </>
         ) : (
-          <AppButton variant="danger" onPress={openDeleteForm}>
+          <AppButton disabled={isBusy} variant="danger" onPress={openDeleteForm}>
             Delete Account
           </AppButton>
         )}
@@ -131,6 +300,18 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
     lineHeight: 25,
     fontWeight: '800',
   },
+  passwordSection: {
+    borderTopWidth: 1,
+    borderTopColor: palette.line,
+    paddingTop: 22,
+    gap: 12,
+  },
+  sectionTitle: {
+    color: palette.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
   dangerSection: {
     borderTopWidth: 1,
     borderTopColor: palette.line,
@@ -148,6 +329,12 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
+  },
+  successText: {
+    color: palette.herb,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   input: {
     minHeight: 52,
