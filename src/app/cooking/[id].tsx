@@ -2,10 +2,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AppButton, BackButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, Header, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
+import { AppPalette, useThemeStyles } from '@/context/theme-store';
 
 export default function CookingModeScreen() {
+  const styles = useThemeStyles(createStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getRecipe } = useRecipes();
   const recipe = getRecipe(id);
@@ -56,14 +58,14 @@ export default function CookingModeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   content: {
     gap: 20,
   },
   progressTrack: {
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#E9DCCA',
+    backgroundColor: palette.progressTrack,
     overflow: 'hidden',
   },
   progressFill: {

@@ -2,9 +2,12 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { BackButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { BackButton, Header, Screen } from '@/components/recipe-ui';
+import { AppPalette, useThemeStyles } from '@/context/theme-store';
 
 export default function AboutScreen() {
+  const styles = useThemeStyles(createStyles);
+
   return (
     <Screen>
       <BackButton onPress={() => router.back()} label="Settings" />
@@ -21,7 +24,7 @@ export default function AboutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
     borderRadius: 18,

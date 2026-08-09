@@ -2,28 +2,30 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
 
-import { palette } from '@/components/recipe-ui';
+import { useAppTheme } from '@/context/theme-store';
 
 type IconName = React.ComponentProps<typeof SymbolView>['name'];
 
-function TabIcon({ focused, name }: { focused: boolean; name: IconName }) {
-  return <SymbolView name={name} size={24} tintColor={focused ? palette.herb : palette.muted} />;
+function TabIcon({ color, name }: { color: string; name: IconName }) {
+  return <SymbolView name={name} size={24} tintColor={color} />;
 }
 
 export default function TabLayout() {
+  const { colors } = useAppTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: palette.herb,
-        tabBarInactiveTintColor: palette.muted,
+        tabBarActiveTintColor: colors.herb,
+        tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '700',
         },
         tabBarStyle: {
-          backgroundColor: palette.paper,
-          borderTopColor: palette.line,
+          backgroundColor: colors.paper,
+          borderTopColor: colors.line,
           height: 86,
           paddingTop: 8,
           paddingBottom: 24,
@@ -33,8 +35,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Recipes',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={{ ios: 'book', android: 'menu_book', web: 'menu_book' }} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={color} name={{ ios: 'book', android: 'menu_book', web: 'menu_book' }} />
           ),
         }}
       />
@@ -42,8 +44,8 @@ export default function TabLayout() {
         name="add"
         options={{
           title: 'Add',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={{ ios: 'plus.circle', android: 'add_circle', web: 'add_circle' }} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={color} name={{ ios: 'plus.circle', android: 'add_circle', web: 'add_circle' }} />
           ),
         }}
       />
@@ -51,8 +53,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={{ ios: 'gear', android: 'settings', web: 'settings' }} />
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={color} name={{ ios: 'gear', android: 'settings', web: 'settings' }} />
           ),
         }}
       />

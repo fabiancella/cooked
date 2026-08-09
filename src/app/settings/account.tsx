@@ -2,10 +2,13 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { AppButton, BackButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, Header, Screen } from '@/components/recipe-ui';
 import { useAuth } from '@/context/auth-store';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 
 export default function AccountScreen() {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { action, clearError, deleteAccount, error, user } = useAuth();
   const [showDeleteForm, setShowDeleteForm] = useState(false);
   const [password, setPassword] = useState('');
@@ -84,7 +87,7 @@ export default function AccountScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               placeholder="Password"
-              placeholderTextColor={palette.muted}
+              placeholderTextColor={colors.muted}
               style={styles.input}
             />
 
@@ -107,7 +110,7 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
     borderRadius: 18,

@@ -563,6 +563,8 @@ function getPrompt(text: string, importMode: RecipeImportMode, metadata: SocialM
     'Never return blank, TBD, unknown, not specified, not provided, or n/a for cookTime or servings.',
     'Use short user-facing estimates like "35 min", "1 hr 15 min", "4 servings", or "12 cookies".',
     'Steps should stay as clear numbered cooking instructions, with one cooking action per step when possible.',
+    'Do not include ingredient quantities in the steps. Keep ingredient quantities only in the ingredients array.',
+    'Keep all other useful values in the steps, including cooking times, temperatures, food dimensions or thickness, pan sizes, speeds, and visual doneness specifications.',
     'Infer source as TikTok, Instagram, or Pasted text when possible. If a social author is provided, use a source like "TikTok by creator".',
     'Do not include markdown, comments, or any text outside the JSON object.',
     ...sharedUrlInstructions,

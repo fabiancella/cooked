@@ -1,13 +1,14 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Text, useColorScheme } from 'react-native';
+import { ActivityIndicator, StatusBar, Text } from 'react-native';
 
 import { AuthScreen } from '@/components/auth-screen';
 import { PendingSharedImportProcessor } from '@/components/pending-shared-import-processor';
-import { Header, palette, Screen } from '@/components/recipe-ui';
+import { Header, Screen } from '@/components/recipe-ui';
 import { AuthProvider, useAuth } from '@/context/auth-store';
 import { RecipeProvider } from '@/context/recipe-store';
+import { AppThemeProvider, useAppTheme } from '@/context/theme-store';
 
 type RootErrorBoundaryState = {
   error: Error | null;
@@ -37,13 +38,14 @@ class RootErrorBoundary extends React.Component<React.PropsWithChildren, RootErr
 
 function AppContent() {
   const { loading, session } = useAuth();
+  const { colors } = useAppTheme();
 
   if (loading) {
     return (
       <Screen>
         <Header eyebrow="Cooked" title="Loading" subtitle="Checking your session." />
-        <ActivityIndicator color={palette.herb} />
-        <Text style={{ color: palette.muted, fontWeight: '700' }}>Preparing your recipe box...</Text>
+        <ActivityIndicator color={colors.herb} />
+        <Text style={{ color: colors.muted, fontWeight: '700' }}>Preparing your recipe box...</Text>
       </Screen>
     );
   }
@@ -58,7 +60,7 @@ function AppContent() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#FFF8F0' },
+          contentStyle: { backgroundColor: colors.cream },
         }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
@@ -80,16 +82,44 @@ function AppContent() {
   );
 }
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function ThemedApp() {
+  const { colors, isDark } = useAppTheme();
+  const navigationTheme = React.useMemo(
+    () => ({
+      ...DefaultTheme,
+      dark: isDark,
+      colors: {
+        ...DefaultTheme.colors,
+        primary: colors.herb,
+        background: colors.cream,
+        card: colors.paper,
+        text: colors.ink,
+        border: colors.line,
+        notification: colors.tomato,
+      },
+    }),
+    [colors, isDark],
+  );
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={colors.cream}
+      />
       <RootErrorBoundary>
         <AuthProvider>
           <AppContent />
         </AuthProvider>
       </RootErrorBoundary>
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <ThemedApp />
+    </AppThemeProvider>
   );
 }

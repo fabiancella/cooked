@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, Header, Screen } from '@/components/recipe-ui';
 import { useAuth } from '@/context/auth-store';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 
 type SettingsRow = {
   title: string;
@@ -22,12 +23,24 @@ const rows: SettingsRow[] = [
 
 export default function SettingsScreen() {
   const { action, error, signOut, user } = useAuth();
+  const { colors, isDark, setDarkMode } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const isSigningOut = action === 'signing-out';
 
   return (
     <Screen bottomPadding={24}>
       <Header eyebrow="Settings" title="Preferences" subtitle={user?.email ?? 'Signed in'} />
       <View style={styles.panel}>
+        <View style={[styles.row, styles.switchRows]}>
+          <Text style={styles.rowText}>Dark Mode</Text>
+          <Switch
+            accessibilityLabel="Dark Mode"
+            value={isDark}
+            onValueChange={setDarkMode}
+            trackColor={{ false: colors.line, true: colors.herb }}
+            ios_backgroundColor={colors.line}
+          />
+        </View>
         {rows.map((row) => (
           <Pressable
             key={row.title}
@@ -47,7 +60,7 @@ export default function SettingsScreen() {
               {row.disabled ? <Text style={styles.rowStatus}>Coming later</Text> : null}
             </View>
             {row.disabled ? null : (
-              <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={18} tintColor={palette.muted} />
+              <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={18} tintColor={colors.muted} />
             )}
           </Pressable>
         ))}
@@ -60,7 +73,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
     borderRadius: 18,
@@ -76,6 +89,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: palette.line,
+  },
+  switchRows: {
+    paddingVertical: 15,
   },
   pressedRow: {
     opacity: 0.72,

@@ -3,10 +3,13 @@ import { SymbolView } from 'expo-symbols';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { AppButton, Header, palette, RecipeCard, Screen } from '@/components/recipe-ui';
+import { AppButton, Header, RecipeCard, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 
 export default function HomeScreen() {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { error, loading, recipes, refreshRecipes } = useRecipes();
   const [query, setQuery] = useState('');
 
@@ -20,26 +23,26 @@ export default function HomeScreen() {
       <Header eyebrow="Cooked" title="Your saved recipes" subtitle="Clean recipe cards from pasted text, captions, and notes." />
 
       <View style={styles.searchBox}>
-        <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor={palette.muted} />
+        <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor={colors.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search recipes"
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={colors.muted}
           style={styles.searchInput}
         />
       </View>
 
       {loading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator color={palette.herb} />
+          <ActivityIndicator color={colors.herb} />
           <Text style={styles.emptyTitle}>Loading recipes</Text>
           <Text style={styles.emptyText}>Fetching your saved recipes.</Text>
         </View>
       ) : error ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
-            <SymbolView name={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }} size={34} tintColor={palette.tomato} />
+            <SymbolView name={{ ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }} size={34} tintColor={colors.tomato} />
           </View>
           <Text style={styles.emptyTitle}>Could not load recipes</Text>
           <Text style={styles.emptyText}>{error}</Text>
@@ -54,7 +57,7 @@ export default function HomeScreen() {
       ) : (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
-            <SymbolView name={{ ios: 'doc.text.magnifyingglass', android: 'description', web: 'description' }} size={34} tintColor={palette.herb} />
+            <SymbolView name={{ ios: 'doc.text.magnifyingglass', android: 'description', web: 'description' }} size={34} tintColor={colors.herb} />
           </View>
           <Text style={styles.emptyTitle}>No recipes found</Text>
           <Text style={styles.emptyText}>Paste recipe text or notes and Cooked will turn them into a tidy recipe card.</Text>
@@ -67,7 +70,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   searchBox: {
     minHeight: 54,
     borderRadius: 14,

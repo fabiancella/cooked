@@ -2,8 +2,8 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Modal, StyleSheet, Text, View } from 'react-native';
 
-import { palette } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
+import { AppPalette, useThemeStyles } from '@/context/theme-store';
 import { clearPendingSharedImport, getPendingSharedImport } from '@/lib/pending-shared-import';
 import { formatRecipeInput, isHttpUrl } from '@/lib/recipe-formatting';
 
@@ -11,6 +11,7 @@ const AUTO_IMPORT_FAILED_ERROR =
   'Could not import this link automatically. Open the post and copy the caption or recipe text to finish.';
 
 export function PendingSharedImportProcessor() {
+  const styles = useThemeStyles(createStyles);
   const { addRecipe } = useRecipes();
   const isProcessing = useRef(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -91,12 +92,12 @@ export function PendingSharedImportProcessor() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   overlay: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(42, 33, 24, 0.34)',
+    backgroundColor: palette.overlay,
     padding: 24,
   },
   panel: {

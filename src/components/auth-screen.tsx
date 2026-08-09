@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { AppButton, Header, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, Header, Screen } from '@/components/recipe-ui';
 import { useAuth } from '@/context/auth-store';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 
 export function AuthScreen() {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { action, clearError, error, signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -54,7 +57,7 @@ export function AuthScreen() {
           autoCorrect={false}
           keyboardType="email-address"
           placeholder="you@example.com"
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={colors.muted}
           style={styles.input}
         />
 
@@ -64,7 +67,7 @@ export function AuthScreen() {
           onChangeText={setPassword}
           secureTextEntry
           placeholder="Password"
-          placeholderTextColor={palette.muted}
+          placeholderTextColor={colors.muted}
           style={styles.input}
         />
 
@@ -88,7 +91,7 @@ export function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   panel: {
     backgroundColor: palette.paper,
     borderRadius: 24,

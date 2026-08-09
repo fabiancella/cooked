@@ -14,8 +14,9 @@ import {
   View
 } from 'react-native';
 
-import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, palette, RecipeImage, Screen } from '@/components/recipe-ui';
+import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, RecipeImage, Screen } from '@/components/recipe-ui';
 import { useRecipes } from '@/context/recipe-store';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 import { Recipe } from '@/data/types';
 
 const COOK_TIME_OPTIONS = [
@@ -188,6 +189,7 @@ function WheelPickerField({
   options: string[];
   onChange: (value: string) => void;
 }) {
+  const styles = useThemeStyles(createStyles);
   const [isOpen, setIsOpen] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const pickerOptions = useMemo(() => getPickerOptions(options, value), [options, value]);
@@ -275,6 +277,8 @@ function DragHandle({
   onDragStart: (index: number) => void;
   style?: View['props']['style'];
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const indexRef = useRef(index);
   const onDragEndRef = useRef(onDragEnd);
   const onDragMoveRef = useRef(onDragMove);
@@ -300,12 +304,14 @@ function DragHandle({
 
   return (
     <View style={[styles.dragHandle, style]} {...panResponder.panHandlers}>
-      <SymbolView name={{ ios: 'line.3.horizontal', android: 'drag_handle', web: 'drag_handle' }} size={18} tintColor={palette.muted} />
+      <SymbolView name={{ ios: 'line.3.horizontal', android: 'drag_handle', web: 'drag_handle' }} size={18} tintColor={colors.muted} />
     </View>
   );
 }
 
 export default function PreviewRecipeScreen() {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { id, recipe } = useLocalSearchParams<{ id?: string; recipe?: string }>();
   const { addRecipe, error, getRecipe, loading, updateRecipe } = useRecipes();
   const existingRecipe = id ? getRecipe(id) : undefined;
@@ -604,7 +610,7 @@ export default function PreviewRecipeScreen() {
                   />
                   {isHeading ? (
                     <View style={styles.headingMarker}>
-                      <SymbolView name={{ ios: 'list.bullet.indent', android: 'format_indent_increase', web: 'format_indent_increase' }} size={18} tintColor={palette.herb} />
+                      <SymbolView name={{ ios: 'list.bullet.indent', android: 'format_indent_increase', web: 'format_indent_increase' }} size={18} tintColor={colors.herb} />
                     </View>
                   ) : (
                     <View style={styles.checkButton} />
@@ -613,7 +619,7 @@ export default function PreviewRecipeScreen() {
                     value={getIngredientInputValue(ingredient)}
                     onChangeText={(value) => updateIngredientRow(index, value)}
                     placeholder={isHeading ? 'Section name' : 'Ingredient'}
-                    placeholderTextColor={palette.muted}
+                    placeholderTextColor={colors.muted}
                     style={[
                       styles.input,
                       styles.rowInput,
@@ -625,17 +631,17 @@ export default function PreviewRecipeScreen() {
                     accessibilityLabel="Remove ingredient"
                     onPress={() => confirmRemoveIngredientRow(index)}
                     style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
-                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
+                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={colors.tomato} />
                   </Pressable>
                 </View>
               );
             })}
             <Pressable onPress={addIngredientRow} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
-              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={palette.herb} />
+              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={colors.herb} />
               <Text style={styles.addRowText}>Add ingredient</Text>
             </Pressable>
             <Pressable onPress={addIngredientSection} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
-              <SymbolView name={{ ios: 'folder.badge.plus', android: 'create_new_folder', web: 'create_new_folder' }} size={20} tintColor={palette.herb} />
+              <SymbolView name={{ ios: 'folder.badge.plus', android: 'create_new_folder', web: 'create_new_folder' }} size={20} tintColor={colors.herb} />
               <Text style={styles.addRowText}>Add Section</Text>
             </Pressable>
           </View>
@@ -666,20 +672,20 @@ export default function PreviewRecipeScreen() {
                     scrollEnabled={false}
                     textAlignVertical="top"
                     placeholder="Recipe step"
-                    placeholderTextColor={palette.muted}
+                    placeholderTextColor={colors.muted}
                     style={[styles.input, styles.stepInput]}
                   />
                   <Pressable
                     accessibilityLabel="Remove step"
                     onPress={() => removeStepRow(index)}
                     style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
-                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={palette.tomato} />
+                    <SymbolView name={{ ios: 'minus.circle', android: 'remove_circle_outline', web: 'remove_circle_outline' }} size={22} tintColor={colors.tomato} />
                   </Pressable>
                 </View>
               );
             })}
             <Pressable onPress={addStepRow} style={({ pressed }) => [styles.addRowButton, pressed && styles.pressed]}>
-              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={palette.herb} />
+              <SymbolView name={{ ios: 'plus.circle.fill', android: 'add_circle', web: 'add_circle' }} size={20} tintColor={colors.herb} />
               <Text style={styles.addRowText}>Add step</Text>
             </Pressable>
           </View>
@@ -704,7 +710,7 @@ export default function PreviewRecipeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   twoColumn: {
     flexDirection: 'row',
     gap: 12,
@@ -843,7 +849,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(42, 33, 24, 0.38)',
+    backgroundColor: palette.overlay,
     justifyContent: 'flex-end',
   },
   pickerSheet: {

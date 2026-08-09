@@ -2,7 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { AppButton, Header, KeyboardDoneAccessory, palette, Screen } from '@/components/recipe-ui';
+import { AppButton, Header, KeyboardDoneAccessory, Screen } from '@/components/recipe-ui';
+import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
 import { EMPTY_RECIPE_TEXT_ERROR, formatRecipeInput, isHttpUrl } from '@/lib/recipe-formatting';
 
 type AddRecipeParams = {
@@ -19,6 +20,8 @@ function getParamText(value?: string | string[]) {
 }
 
 export default function AddRecipeScreen() {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { importError, sharedText } = useLocalSearchParams<AddRecipeParams>();
   const [text, setText] = useState('');
   const [isFormatting, setIsFormatting] = useState(false);
@@ -87,7 +90,7 @@ export default function AddRecipeScreen() {
             multiline
             textAlignVertical="top"
             placeholder="Example: saw this pasta on IG... boil rigatoni, lemon, parm, butter, pasta water..."
-            placeholderTextColor={palette.muted}
+            placeholderTextColor={colors.muted}
             style={styles.textArea}
           />
         </View>
@@ -119,7 +122,7 @@ export default function AddRecipeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (palette: AppPalette) => StyleSheet.create({
   inputPanel: {
     gap: 10,
   },

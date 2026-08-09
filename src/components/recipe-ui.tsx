@@ -16,19 +16,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppPalette, useAppTheme } from '@/context/theme-store';
 import { Recipe } from '@/data/types';
 
-export const palette = {
-  cream: '#FFF8F0',
-  paper: '#FFFFFF',
-  ink: '#2A2118',
-  muted: '#7D6E61',
-  line: '#EADCCB',
-  herb: '#41644A',
-  tomato: '#D85A3A',
-  butter: '#F4C95D',
-  sage: '#EAF1E8',
-};
+function useRecipeUiTheme() {
+  const { colors } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  return { colors, styles };
+}
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
@@ -38,6 +34,7 @@ type ScreenProps = PropsWithChildren<{
 }>;
 
 export function Screen({ children, scroll = true, scrollEnabled = true, contentStyle, bottomPadding = 32 }: ScreenProps) {
+  const { styles } = useRecipeUiTheme();
   const contentStyles = [styles.content, { paddingBottom: bottomPadding }, contentStyle];
 
   if (!scroll) {
@@ -63,6 +60,8 @@ export function Screen({ children, scroll = true, scrollEnabled = true, contentS
 
 
 export function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+  const { styles } = useRecipeUiTheme();
+
   return (
     <View style={styles.header}>
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
@@ -73,9 +72,11 @@ export function Header({ eyebrow, title, subtitle }: { eyebrow?: string; title: 
 }
 
 export function BackButton({ onPress, label = 'Back' }: { onPress: () => void; label?: string }) {
+  const { colors, styles } = useRecipeUiTheme();
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-      <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={18} tintColor={palette.herb} />
+      <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={18} tintColor={colors.herb} />
     </Pressable>
   );
 }
@@ -87,7 +88,8 @@ type ButtonProps = PressableProps &
   }>;
 
 export function AppButton({ children, variant = 'primary', icon, style, ...props }: ButtonProps) {
-  const iconColor = variant === 'primary' ? palette.paper : variant === 'danger' ? palette.tomato : palette.ink;
+  const { colors, styles } = useRecipeUiTheme();
+  const iconColor = variant === 'primary' ? colors.paper : variant === 'danger' ? colors.tomato : colors.ink;
 
   return (
     <Pressable
@@ -116,6 +118,7 @@ export function AppButton({ children, variant = 'primary', icon, style, ...props
 }
 
 export function KeyboardDoneAccessory() {
+  const { styles } = useRecipeUiTheme();
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   React.useEffect(() => {
@@ -172,6 +175,7 @@ function getSourcePillBackground(source: string) {
 }
 
 export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () => void }) {
+  const { styles } = useRecipeUiTheme();
   const sourcePillBackground = getSourcePillBackground(recipe.source);
 
   return (
@@ -193,6 +197,7 @@ export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () =>
 }
 
 function RecipeCardImage({ recipe }: { recipe: Recipe }) {
+  const { colors, styles } = useRecipeUiTheme();
   const [imageFailed, setImageFailed] = React.useState(false);
 
   React.useEffect(() => {
@@ -202,7 +207,7 @@ function RecipeCardImage({ recipe }: { recipe: Recipe }) {
   if (!recipe.imageUrl || imageFailed) {
     return (
       <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
-        <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={palette.paper} />
+        <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={colors.paper} />
       </View>
     );
   }
@@ -222,6 +227,8 @@ export function EditableField({
   label,
   children,
 }: PropsWithChildren<{ compact?: boolean; label: string }>) {
+  const { styles } = useRecipeUiTheme();
+
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -232,15 +239,18 @@ export function EditableField({
   );
 }
 
-export function PlaceholderImage({ color = palette.butter }: { color?: string }) {
+export function PlaceholderImage({ color }: { color?: string }) {
+  const { colors, styles } = useRecipeUiTheme();
+
   return (
-    <View style={[styles.heroImage, { backgroundColor: color }]}>
-      <SymbolView name={{ ios: 'photo', android: 'image', web: 'photo' }} size={34} tintColor={palette.paper} />
+    <View style={[styles.heroImage, { backgroundColor: color ?? colors.butter }]}>
+      <SymbolView name={{ ios: 'photo', android: 'image', web: 'photo' }} size={34} tintColor={colors.paper} />
     </View>
   );
 }
 
 export function RecipeImage({ recipe }: { recipe: Recipe }) {
+  const { styles } = useRecipeUiTheme();
   const [imageFailed, setImageFailed] = React.useState(false);
 
   React.useEffect(() => {
@@ -305,7 +315,8 @@ export function ExternalUrl({ label = 'View original video', url }: { label?: st
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(palette: AppPalette) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: palette.cream,
@@ -346,7 +357,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: palette.sage,
     borderWidth: 1,
-    borderColor: '#D4E1D0',
+    borderColor: palette.sageLine,
     paddingHorizontal: 12,
     alignItems: 'center',
     flexDirection: 'row',
@@ -372,15 +383,15 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: palette.sage,
     borderWidth: 1,
-    borderColor: '#D4E1D0',
+    borderColor: palette.sageLine,
   },
   ghostButton: {
     backgroundColor: 'transparent',
   },
   dangerButton: {
-    backgroundColor: '#FFF1ED',
+    backgroundColor: palette.dangerSurface,
     borderWidth: 1,
-    borderColor: '#F3C0B5',
+    borderColor: palette.dangerLine,
   },
   buttonText: {
     color: palette.ink,
@@ -399,7 +410,7 @@ const styles = StyleSheet.create({
     backgroundColor: palette.paper,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: palette.shadow,
     shadowOpacity: 0.16,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
@@ -422,7 +433,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: palette.line,
     overflow: 'hidden',
-    shadowColor: '#3B2513',
+    shadowColor: palette.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
@@ -451,6 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   sourcePill: {
+    color: '#2A2118',
     alignSelf: 'flex-start',
     borderRadius: 999,
     overflow: 'hidden',
@@ -470,7 +482,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   dot: {
-    color: '#C4A990',
+    color: palette.dot,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -511,4 +523,5 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 18,
   },
-});
+  });
+}

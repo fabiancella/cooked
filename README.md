@@ -6,7 +6,7 @@ Cooked is an Expo React Native app for saving recipes from messy text, social ca
 
 [Join the Cooked iOS TestFlight Beta](https://testflight.apple.com/join/ACZQGBTR)
 
-Requires an iPhone with TestFlight installed.
+Requires an iPhone with TestFlight installed. 
 
 ## Features
 
