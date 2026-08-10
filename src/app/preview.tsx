@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -849,7 +849,9 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
     padding: 0,
   },
   titleInput: {
-    minHeight: 28,
+    height: 28,
+    textAlignVertical: 'center',
+    transform: [{ translateY: -4 }],
   },
   actions: {
     gap: 10,
