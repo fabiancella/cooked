@@ -7,6 +7,7 @@ export type Recipe = {
   source: string;
   sourceText?: string | null;
   imageUrl?: string | null;
+  customImageUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
   color: string;

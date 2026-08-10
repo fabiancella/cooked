@@ -4,10 +4,10 @@ import {
   Alert,
   Image,
   Keyboard,
+  Linking,
   Platform,
   Pressable,
   PressableProps,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -204,13 +204,15 @@ export function RecipeCard({ recipe, onPress }: { recipe: Recipe; onPress: () =>
 
 function RecipeCardImage({ recipe }: { recipe: Recipe }) {
   const { colors, styles } = useRecipeUiTheme();
-  const [imageFailed, setImageFailed] = React.useState(false);
+  const [failedImageUrls, setFailedImageUrls] = React.useState<string[]>([]);
+  const imageUrl = [recipe.customImageUrl, recipe.imageUrl]
+    .find((url): url is string => Boolean(url && !failedImageUrls.includes(url)));
 
   React.useEffect(() => {
-    setImageFailed(false);
-  }, [recipe.imageUrl]);
+    setFailedImageUrls([]);
+  }, [recipe.customImageUrl, recipe.imageUrl]);
 
-  if (!recipe.imageUrl || imageFailed) {
+  if (!imageUrl) {
     return (
       <View style={[styles.imageBlock, { backgroundColor: recipe.color }]}>
         <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={30} tintColor={colors.paper} />
@@ -220,9 +222,9 @@ function RecipeCardImage({ recipe }: { recipe: Recipe }) {
 
   return (
     <Image
-      onError={() => setImageFailed(true)}
+      onError={() => setFailedImageUrls((currentUrls) => [...currentUrls, imageUrl])}
       resizeMode="cover"
-      source={{ uri: recipe.imageUrl }}
+      source={{ uri: imageUrl }}
       style={styles.cardImage}
     />
   );
@@ -257,21 +259,23 @@ export function PlaceholderImage({ color }: { color?: string }) {
 
 export function RecipeImage({ recipe }: { recipe: Recipe }) {
   const { styles } = useRecipeUiTheme();
-  const [imageFailed, setImageFailed] = React.useState(false);
+  const [failedImageUrls, setFailedImageUrls] = React.useState<string[]>([]);
+  const imageUrl = [recipe.customImageUrl, recipe.imageUrl]
+    .find((url): url is string => Boolean(url && !failedImageUrls.includes(url)));
 
   React.useEffect(() => {
-    setImageFailed(false);
-  }, [recipe.imageUrl]);
+    setFailedImageUrls([]);
+  }, [recipe.customImageUrl, recipe.imageUrl]);
 
-  if (!recipe.imageUrl || imageFailed) {
+  if (!imageUrl) {
     return <PlaceholderImage color={recipe.color} />;
   }
 
   return (
     <Image
-      onError={() => setImageFailed(true)}
+      onError={() => setFailedImageUrls((currentUrls) => [...currentUrls, imageUrl])}
       resizeMode="cover"
-      source={{ uri: recipe.imageUrl }}
+      source={{ uri: imageUrl }}
       style={styles.heroPhoto}
     />
   );

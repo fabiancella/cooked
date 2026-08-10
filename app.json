@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cooked",
     "slug": "cooked",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cooked",
@@ -11,7 +11,7 @@
       "icon": "./assets/images/icon.png",
       "appleTeamId": "QKR7TMBHB4",
       "bundleIdentifier": "com.fabiancella.cooked",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.fabiancella.cooked"
@@ -37,6 +37,12 @@
     "plugins": [
       "expo-router",
       "@bacons/apple-targets",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Cooked to choose a custom recipe thumbnail."
+        }
+      ],
       [
         "expo-splash-screen",
         {

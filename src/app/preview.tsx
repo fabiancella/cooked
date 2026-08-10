@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -11,12 +12,15 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View
+  View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton, BackButton, EditableField, Header, KeyboardDoneAccessory, RecipeImage, Screen } from '@/components/recipe-ui';
+import { useAuth } from '@/context/auth-store';
 import { useRecipes } from '@/context/recipe-store';
 import { AppPalette, useAppTheme, useThemeStyles } from '@/context/theme-store';
+import { removeCustomRecipeImage, uploadCustomRecipeImage } from '@/data/storage';
 import { Recipe } from '@/data/types';
 
 const COOK_TIME_OPTIONS = [
@@ -53,6 +57,8 @@ const WHEEL_ROW_HEIGHT = 48;
 const INGREDIENT_DRAG_ROW_HEIGHT = 56;
 const STEP_DRAG_ROW_HEIGHT = 64;
 const INGREDIENT_SECTION_PREFIX = '__section__:';
+const STICKY_ACTION_TOP_PADDING = 12;
+const STICKY_ACTION_BUTTON_HEIGHT = 52;
 let nextEditorRowId = 0;
 
 function getEditorRowId() {
@@ -310,8 +316,10 @@ function DragHandle({
 }
 
 export default function PreviewRecipeScreen() {
+  const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const styles = useThemeStyles(createStyles);
+  const { user } = useAuth();
   const { id, recipe } = useLocalSearchParams<{ id?: string; recipe?: string }>();
   const { addRecipe, error, getRecipe, loading, updateRecipe } = useRecipes();
   const existingRecipe = id ? getRecipe(id) : undefined;
@@ -319,6 +327,9 @@ export default function PreviewRecipeScreen() {
   const initialRecipe = existingRecipe ?? formattedRecipe;
   const [isSaving, setIsSaving] = useState(false);
   const [title, setTitle] = useState(initialRecipe?.title ?? '');
+  const [customImageUrl, setCustomImageUrl] = useState(initialRecipe?.customImageUrl ?? null);
+  const [pendingCustomImage, setPendingCustomImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [cookTime, setCookTime] = useState(initialRecipe?.cookTime ?? '');
   const [servings, setServings] = useState(() => getServingLabel(initialRecipe?.servings));
   const [ingredientRows, setIngredientRows] = useState(initialRecipe?.ingredients ?? []);
@@ -333,6 +344,9 @@ export default function PreviewRecipeScreen() {
     }
 
     setTitle(initialRecipe.title);
+    setCustomImageUrl(initialRecipe.customImageUrl ?? null);
+    setPendingCustomImage(null);
+    setImageError(null);
     setCookTime(initialRecipe.cookTime);
     setServings(getServingLabel(initialRecipe.servings));
     setIngredientRows(initialRecipe.ingredients);
@@ -345,6 +359,50 @@ export default function PreviewRecipeScreen() {
   const steps = useMemo(() => getCleanItems(stepRows), [stepRows]);
   const validationError = useMemo(() => getValidationError(title, ingredients, steps), [ingredients, steps, title]);
   const isSaveDisabled = isSaving || Boolean(validationError);
+  const stickyActionBottomPadding = Math.max(insets.bottom, 12);
+  const stickyActionHeight = STICKY_ACTION_TOP_PADDING + STICKY_ACTION_BUTTON_HEIGHT + stickyActionBottomPadding;
+
+  const chooseCustomImage = async () => {
+    setImageError(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Photo access needed', 'Allow photo access to choose a custom recipe thumbnail.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.85,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const selectedImage = result.assets[0];
+    setPendingCustomImage(selectedImage);
+    setCustomImageUrl(selectedImage.uri);
+  };
+
+  const revertToDefaultImage = () => {
+    setPendingCustomImage(null);
+    setCustomImageUrl(null);
+    setImageError(null);
+  };
+
+  const confirmRevertToDefaultImage = () => {
+    Alert.alert(
+      'Revert thumbnail?',
+      'This will remove your custom thumbnail and restore the original recipe image when you save.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Revert', style: 'destructive', onPress: revertToDefaultImage },
+      ],
+    );
+  };
 
   const addIngredientRow = () => {
     setIngredientRows((currentRows) => [...currentRows, '']);
@@ -504,10 +562,11 @@ export default function PreviewRecipeScreen() {
       title: title.trim(),
       cookTime: cookTime.trim() || 'Cook time TBD',
       servings: getServingLabel(servings),
+      customImageUrl,
       ingredients,
       steps,
     }) : null,
-    [cookTime, ingredients, initialRecipe, servings, steps, title],
+    [cookTime, customImageUrl, ingredients, initialRecipe, servings, steps, title],
   );
 
   const saveRecipe = async () => {
@@ -516,14 +575,55 @@ export default function PreviewRecipeScreen() {
     }
 
     setIsSaving(true);
-    const savedRecipe = id ? await updateRecipe(id, editedRecipe) : await addRecipe(editedRecipe);
-    setIsSaving(false);
+    setImageError(null);
+    let uploadedImageUrl: string | null = null;
 
-    if (!savedRecipe) {
-      return;
+    try {
+      if (pendingCustomImage) {
+        if (!user) {
+          setImageError('Log in again before uploading a custom thumbnail.');
+          return;
+        }
+
+        uploadedImageUrl = await uploadCustomRecipeImage(
+          pendingCustomImage.uri,
+          pendingCustomImage.mimeType,
+          user.id,
+        );
+      }
+
+      const recipeToSave = {
+        ...editedRecipe,
+        customImageUrl: uploadedImageUrl ?? customImageUrl,
+      };
+      const savedRecipe = id ? await updateRecipe(id, recipeToSave) : await addRecipe(recipeToSave);
+
+      if (!savedRecipe) {
+        if (uploadedImageUrl && user) {
+          await removeCustomRecipeImage(uploadedImageUrl, user.id);
+        }
+        return;
+      }
+
+      const previousCustomImageUrl = initialRecipe?.customImageUrl;
+
+      if (previousCustomImageUrl && previousCustomImageUrl !== savedRecipe.customImageUrl && user) {
+        void removeCustomRecipeImage(previousCustomImageUrl, user.id).catch((cleanupError) => {
+          console.error('Could not remove the previous custom recipe image:', cleanupError);
+        });
+      }
+
+      router.replace({ pathname: '/recipe/[id]', params: { id: savedRecipe.id } });
+    } catch (uploadError) {
+      if (uploadedImageUrl && user) {
+        await removeCustomRecipeImage(uploadedImageUrl, user.id).catch(() => undefined);
+      }
+
+      console.error('Could not save custom recipe image:', uploadError);
+      setImageError('Could not upload the custom thumbnail. Please try another image.');
+    } finally {
+      setIsSaving(false);
     }
-
-    router.replace({ pathname: '/recipe/[id]', params: { id: savedRecipe.id } });
   };
 
   if (id && loading && !existingRecipe) {
@@ -554,15 +654,32 @@ export default function PreviewRecipeScreen() {
   }
 
   return (
-    <>
-      <Screen scrollEnabled={dragState === null}>
+    <View style={styles.screen}>
+      <Screen scrollEnabled={dragState === null} bottomPadding={stickyActionHeight + 32}>
         <BackButton onPress={goBackFromPreview} />
         <Header
           eyebrow={id ? 'Edit recipe' : 'Preview'}
           title={id ? 'Update recipe' : 'Formatted recipe'}
           subtitle="Review the formatted fields before saving."
         />
-        <RecipeImage recipe={initialRecipe} />
+        <RecipeImage recipe={editedRecipe ?? initialRecipe} />
+        <View style={styles.imageActions}>
+          <AppButton
+            variant="secondary"
+            onPress={chooseCustomImage}
+            icon={{ ios: 'photo.badge.plus', android: 'add_photo_alternate', web: 'add_photo_alternate' }}>
+            {customImageUrl ? 'Change custom thumbnail' : 'Choose custom thumbnail'}
+          </AppButton>
+          {customImageUrl ? (
+            <AppButton
+              variant="ghost"
+              onPress={confirmRevertToDefaultImage}
+              icon={{ ios: 'arrow.uturn.backward', android: 'undo', web: 'undo' }}>
+              Revert to default thumbnail
+            </AppButton>
+          ) : null}
+          {imageError ? <Text style={styles.errorText}>{imageError}</Text> : null}
+        </View>
 
         <EditableField compact label="Title">
           <TextInput
@@ -694,23 +811,32 @@ export default function PreviewRecipeScreen() {
         <View style={styles.actions}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {validationError ? <Text style={styles.errorText}>{validationError}</Text> : null}
+          <AppButton variant="danger" onPress={goBackFromPreview}>
+            Cancel
+          </AppButton>
+        </View>
+      </Screen>
+
+      <View style={[styles.stickyActionBar, { paddingBottom: stickyActionBottomPadding }]}>
+        <View style={styles.stickyActionContent}>
           <AppButton
             disabled={isSaveDisabled}
             onPress={saveRecipe}
             icon={{ ios: 'checkmark', android: 'check', web: 'check' }}>
             {isSaving ? (id ? 'Updating...' : 'Saving...') : id ? 'Update Recipe' : 'Save Recipe'}
           </AppButton>
-          <AppButton variant="danger" onPress={goBackFromPreview}>
-            Cancel
-          </AppButton>
         </View>
-      </Screen>
+      </View>
       <KeyboardDoneAccessory />
-    </>
+    </View>
   );
 }
 
 const createStyles = (palette: AppPalette) => StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: palette.cream,
+  },
   twoColumn: {
     flexDirection: 'row',
     gap: 12,
@@ -727,6 +853,26 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
   },
   actions: {
     gap: 10,
+  },
+  imageActions: {
+    gap: 8,
+  },
+  stickyActionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    borderTopWidth: 1,
+    borderTopColor: palette.line,
+    backgroundColor: palette.cream,
+    paddingTop: STICKY_ACTION_TOP_PADDING,
+  },
+  stickyActionContent: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
   },
   editorList: {
     gap: 12,

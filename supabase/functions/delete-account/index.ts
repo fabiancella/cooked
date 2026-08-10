@@ -31,7 +31,11 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function getRecipeImagePath(imageUrl: string, supabaseUrl: string) {
+function getRecipeImagePath(
+  imageUrl: string,
+  supabaseUrl: string,
+  userId: string,
+) {
   try {
     const image = new URL(imageUrl);
     const project = new URL(supabaseUrl);
@@ -50,7 +54,8 @@ function getRecipeImagePath(imageUrl: string, supabaseUrl: string) {
       image.search ||
       image.hash ||
       rawFilePath !== filePath ||
-      !IMPORTED_IMAGE_PATH.test(filePath)
+      !IMPORTED_IMAGE_PATH.test(filePath) &&
+      !filePath.startsWith(`${userId}/custom/`)
     ) {
       return null;
     }
@@ -71,9 +76,8 @@ async function getUserRecipeImageUrls(
   while (true) {
     const { data: recipes, error } = await admin
       .from("recipes")
-      .select("id, image_url")
+      .select("id, image_url, custom_image_url")
       .eq("user_id", userId)
-      .not("image_url", "is", null)
       .order("id")
       .range(offset, offset + RECIPE_QUERY_PAGE_SIZE - 1);
 
@@ -84,6 +88,10 @@ async function getUserRecipeImageUrls(
     for (const recipe of recipes ?? []) {
       if (typeof recipe.image_url === "string") {
         imageUrls.push(recipe.image_url);
+      }
+
+      if (typeof recipe.custom_image_url === "string") {
+        imageUrls.push(recipe.custom_image_url);
       }
     }
 
@@ -104,7 +112,7 @@ async function deleteRecipeImages(
   const imageUrls = [
     ...new Set(
       recipeImageUrls.filter((imageUrl) =>
-        Boolean(getRecipeImagePath(imageUrl, supabaseUrl))
+        Boolean(getRecipeImagePath(imageUrl, supabaseUrl, userId))
       ),
     ),
   ];
@@ -137,7 +145,7 @@ async function deleteRecipeImages(
     ...new Set(
       imageUrls
         .filter((imageUrl) => !sharedImageUrls.has(imageUrl))
-        .map((imageUrl) => getRecipeImagePath(imageUrl, supabaseUrl))
+        .map((imageUrl) => getRecipeImagePath(imageUrl, supabaseUrl, userId))
         .filter((path): path is string => Boolean(path)),
     ),
   ];
