@@ -11,6 +11,13 @@ const GEMINI_RETRY_STATUSES = [429, 500, 502, 503, 504];
 const GEMINI_RETRY_DELAYS_MS = [500, 1500, 3000];
 const RECIPE_IMAGE_BUCKET = 'recipe-images';
 const MAX_RECIPE_IMAGE_BYTES = 8 * 1024 * 1024;
+const TIKTOK_REDIRECT_STATUSES = [301, 302, 303, 307, 308];
+const TIKTOK_MAX_REDIRECTS = 5;
+const TIKTOK_PAGE_HEADERS = {
+  Accept: 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'User-Agent': 'Mozilla/5.0 (compatible; CookedRecipeImporter/1.0)',
+};
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
@@ -65,6 +72,15 @@ type SocialMetadata = {
   imageUrl?: string;
   providerName?: string;
   title?: string;
+};
+
+type TikTokCaptionSource = 'oembed' | 'page-metadata' | 'none';
+type TikTokPostType = 'video' | 'photo' | 'other';
+
+type TikTokMetadataResult = {
+  captionSource: TikTokCaptionSource;
+  metadata: SocialMetadata | null;
+  postType: TikTokPostType;
 };
 
 function logImport(requestId: string, message: string, details?: Record<string, unknown>) {
@@ -486,6 +502,21 @@ function getPageTitle(html: string) {
   return title || undefined;
 }
 
+function getScriptContent(html: string, id: string) {
+  const scriptTags = html.match(/<script\b[^>]*>[\s\S]*?<\/script>/gi) ?? [];
+
+  for (const tag of scriptTags) {
+    if (getHtmlAttribute(tag.slice(0, tag.indexOf('>') + 1), 'id') !== id) {
+      continue;
+    }
+
+    const openingTagEnd = tag.indexOf('>');
+    return tag.slice(openingTagEnd + 1).replace(/<\/script>\s*$/i, '').trim();
+  }
+
+  return null;
+}
+
 function getMetadataPrompt(metadata: SocialMetadata | null) {
   if (!metadata) {
     return '';
@@ -575,7 +606,243 @@ function getPrompt(text: string, importMode: RecipeImportMode, metadata: SocialM
   ].join('\n');
 }
 
-async function getTikTokMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
+function getTikTokPostType(url: string): TikTokPostType {
+  const pathname = getParsedUrl(url)?.pathname ?? '';
+
+  if (/\/@[^/]+\/video\/\d+\/?$/i.test(pathname)) {
+    return 'video';
+  }
+
+  if (/\/@[^/]+\/photo\/\d+\/?$/i.test(pathname)) {
+    return 'photo';
+  }
+
+  return 'other';
+}
+
+function getCanonicalTikTokUrl(url: string) {
+  const parsedUrl = getParsedUrl(url);
+
+  if (!parsedUrl || !isTikTokUrl(url)) {
+    return null;
+  }
+
+  parsedUrl.search = '';
+  parsedUrl.hash = '';
+
+  return parsedUrl.toString();
+}
+
+async function resolveTikTokUrl(url: string, requestId: string) {
+  let currentUrl = url;
+
+  for (let redirectCount = 0; redirectCount <= TIKTOK_MAX_REDIRECTS; redirectCount += 1) {
+    const postType = getTikTokPostType(currentUrl);
+
+    if (postType !== 'other') {
+      return getCanonicalTikTokUrl(currentUrl);
+    }
+
+    const response = await fetch(currentUrl, {
+      headers: TIKTOK_PAGE_HEADERS,
+      redirect: 'manual',
+    });
+
+    logImport(requestId, 'TikTok URL resolution response received', {
+      status: response.status,
+      redirectCount,
+      url: getUrlLogDetails(currentUrl),
+    });
+
+    await response.body?.cancel();
+
+    if (!TIKTOK_REDIRECT_STATUSES.includes(response.status)) {
+      return null;
+    }
+
+    const location = response.headers.get('location');
+
+    if (!location) {
+      return null;
+    }
+
+    const nextUrl = new URL(location, currentUrl).toString();
+
+    if (!isHttpUrl(nextUrl) || !isTikTokUrl(nextUrl)) {
+      logImport(requestId, 'TikTok URL resolution rejected redirect', {
+        target: getUrlLogDetails(nextUrl),
+      });
+      return null;
+    }
+
+    currentUrl = nextUrl;
+  }
+
+  return null;
+}
+
+function getTikTokPostId(url: string) {
+  return getParsedUrl(url)?.pathname.match(/\/(?:video|photo)\/(\d+)\/?$/i)?.[1] ?? null;
+}
+
+function getTikTokAuthorFromUrl(url: string) {
+  const author = getParsedUrl(url)?.pathname.match(/^\/@([^/]+)\//)?.[1];
+
+  return getCleanAuthorName(author);
+}
+
+function getTikTokCaption(metadata: SocialMetadata | null) {
+  return metadata?.title?.trim() || metadata?.description?.trim() || null;
+}
+
+function getCleanTikTokPageCaption(value?: string) {
+  const caption = value ? decodeHtmlEntities(value).replace(/\s+/g, ' ').trim() : '';
+  const normalizedCaption = caption.toLowerCase();
+
+  if (
+    !caption ||
+    normalizedCaption === 'tiktok' ||
+    normalizedCaption === 'tiktok - make your day' ||
+    normalizedCaption === 'make your day' ||
+    normalizedCaption.startsWith('log in to tiktok') ||
+    normalizedCaption.startsWith('tiktok is the destination for') ||
+    normalizedCaption.startsWith('tiktok - trends start here')
+  ) {
+    return null;
+  }
+
+  return caption;
+}
+
+function getEmbeddedTikTokAuthor(value: Record<string, unknown>) {
+  const author = value.author;
+
+  if (!author || typeof author !== 'object') {
+    return null;
+  }
+
+  const authorData = author as Record<string, unknown>;
+  const authorName = typeof authorData.nickname === 'string'
+    ? authorData.nickname
+    : typeof authorData.uniqueId === 'string'
+      ? authorData.uniqueId
+      : undefined;
+
+  return getCleanAuthorName(authorName);
+}
+
+function findEmbeddedTikTokPost(
+  value: unknown,
+  postId: string,
+  depth = 0,
+): { authorName: string | null; caption: string } | null {
+  if (!value || typeof value !== 'object' || depth > 20) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const post = findEmbeddedTikTokPost(item, postId, depth + 1);
+
+      if (post) {
+        return post;
+      }
+    }
+
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const recordId = record.id ?? record.itemId ?? record.aweme_id ?? record.awemeId;
+  const caption = getCleanTikTokPageCaption(typeof record.desc === 'string' ? record.desc : undefined);
+
+  if (String(recordId ?? '') === postId && caption) {
+    return {
+      authorName: getEmbeddedTikTokAuthor(record),
+      caption,
+    };
+  }
+
+  for (const nestedValue of Object.values(record)) {
+    const post = findEmbeddedTikTokPost(nestedValue, postId, depth + 1);
+
+    if (post) {
+      return post;
+    }
+  }
+
+  return null;
+}
+
+function getEmbeddedTikTokPostFromHtml(html: string, postId: string) {
+  const scriptIds = ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE'];
+
+  for (const scriptId of scriptIds) {
+    const content = getScriptContent(html, scriptId);
+
+    if (!content) {
+      continue;
+    }
+
+    try {
+      const post = findEmbeddedTikTokPost(JSON.parse(content), postId);
+
+      if (post) {
+        return post;
+      }
+    } catch {
+      // Continue to the next public metadata source.
+    }
+  }
+
+  return null;
+}
+
+async function getTikTokPageMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
+  logImport(requestId, 'requesting TikTok page metadata', getUrlLogDetails(url));
+  const response = await fetch(url, {
+    headers: TIKTOK_PAGE_HEADERS,
+    redirect: 'manual',
+  });
+
+  logImport(requestId, 'TikTok page metadata response received', {
+    status: response.status,
+    contentType: response.headers.get('content-type'),
+  });
+
+  if (!response.ok) {
+    await response.body?.cancel();
+    return null;
+  }
+
+  const html = await response.text();
+  const postId = getTikTokPostId(url);
+  const embeddedPost = postId ? getEmbeddedTikTokPostFromHtml(html, postId) : null;
+  const metadataCaption = getCleanTikTokPageCaption(
+    getMetaContent(html, ['og:description', 'twitter:description', 'description']),
+  );
+  const caption = embeddedPost?.caption ?? metadataCaption;
+
+  logImport(requestId, 'TikTok page metadata parsed', {
+    htmlLength: html.length,
+    metaTagCount: countMetaTags(html),
+    hasEmbeddedPost: Boolean(embeddedPost),
+    hasCaption: Boolean(caption),
+    captionLength: caption?.length ?? 0,
+  });
+
+  if (!caption) {
+    return null;
+  }
+
+  return {
+    authorName: embeddedPost?.authorName ?? getTikTokAuthorFromUrl(url) ?? undefined,
+    providerName: 'TikTok',
+    title: caption,
+  };
+}
+
+async function getTikTokOEmbedMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
   logImport(requestId, 'requesting TikTok oEmbed metadata');
   const response = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`);
 
@@ -602,6 +869,79 @@ async function getTikTokMetadata(url: string, requestId: string): Promise<Social
   });
 
   return metadata;
+}
+
+async function getTikTokMetadata(url: string, requestId: string): Promise<TikTokMetadataResult> {
+  const canonicalUrl = await resolveTikTokUrl(url, requestId);
+  const postType = canonicalUrl ? getTikTokPostType(canonicalUrl) : 'other';
+
+  if (!canonicalUrl || postType === 'other') {
+    logImport(requestId, 'TikTok caption lookup completed', {
+      postType,
+      metadataStatus: 'unavailable',
+      captionSource: 'none',
+      captionLength: 0,
+    });
+
+    return {
+      captionSource: 'none',
+      metadata: null,
+      postType,
+    };
+  }
+
+  let oEmbedMetadata: SocialMetadata | null = null;
+
+  try {
+    oEmbedMetadata = await getTikTokOEmbedMetadata(canonicalUrl, requestId);
+  } catch (error) {
+    logImport(requestId, 'TikTok oEmbed request failed', {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+  }
+
+  const oEmbedCaption = getTikTokCaption(oEmbedMetadata);
+
+  if (oEmbedCaption) {
+    logImport(requestId, 'TikTok caption lookup completed', {
+      postType,
+      metadataStatus: 'available',
+      captionSource: 'oembed',
+      captionLength: oEmbedCaption.length,
+    });
+
+    return {
+      captionSource: 'oembed',
+      metadata: oEmbedMetadata,
+      postType,
+    };
+  }
+
+  let pageMetadata: SocialMetadata | null = null;
+
+  try {
+    pageMetadata = await getTikTokPageMetadata(canonicalUrl, requestId);
+  } catch (error) {
+    logImport(requestId, 'TikTok page metadata request failed', {
+      errorType: error instanceof Error ? error.name : typeof error,
+    });
+  }
+
+  const pageCaption = getTikTokCaption(pageMetadata);
+  const captionSource: TikTokCaptionSource = pageCaption ? 'page-metadata' : 'none';
+
+  logImport(requestId, 'TikTok caption lookup completed', {
+    postType,
+    metadataStatus: pageCaption ? 'available' : 'unavailable',
+    captionSource,
+    captionLength: pageCaption?.length ?? 0,
+  });
+
+  return {
+    captionSource,
+    metadata: pageMetadata,
+    postType,
+  };
 }
 
 async function getInstagramMetadata(url: string, requestId: string): Promise<SocialMetadata | null> {
@@ -760,6 +1100,8 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
   const isTikTokImport = isSharedUrl && isTikTokUrl(text);
   const isInstagramImport = isSharedUrl && isInstagramUrl(text);
   let metadata: SocialMetadata | null = null;
+  let tikTokCaptionSource: TikTokCaptionSource = 'none';
+  let tikTokPostType: TikTokPostType = 'other';
 
   logImport(requestId, 'formatting started', {
     importMode,
@@ -770,10 +1112,14 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
 
   if (isTikTokImport) {
     try {
-      metadata = await getTikTokMetadata(text, requestId);
+      const tikTokResult = await getTikTokMetadata(text, requestId);
+      metadata = tikTokResult.metadata;
+      tikTokCaptionSource = tikTokResult.captionSource;
+      tikTokPostType = tikTokResult.postType;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown TikTok oEmbed error';
-      logImport(requestId, 'TikTok oEmbed request failed', { message });
+      logImport(requestId, 'TikTok metadata request failed', {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
       metadata = null;
     }
   } else if (isInstagramImport) {
@@ -785,6 +1131,16 @@ async function formatWithGemini(text: string, importMode: RecipeImportMode, requ
       metadata = null;
     }
   }
+
+  if (isTikTokImport && (tikTokCaptionSource === 'none' || !getTikTokCaption(metadata))) {
+    logImport(requestId, 'TikTok import rejected before Gemini because no public caption was available', {
+      postType: tikTokPostType,
+      captionSource: tikTokCaptionSource,
+      captionLength: 0,
+    });
+    throw new RecipeValidationError();
+  }
+
   const socialSource = isTikTokImport
     ? getSocialSource('TikTok', metadata)
     : isInstagramImport

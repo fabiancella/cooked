@@ -67,7 +67,7 @@ export default function AddRecipeScreen() {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not format this recipe. Try again.';
+      const message = error instanceof Error ? error.message : 'Could not format this recipe. Check if caption contains recipe.';
       setFormatError(message);
     } finally {
       setIsFormatting(false);
