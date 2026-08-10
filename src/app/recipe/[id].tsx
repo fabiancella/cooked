@@ -256,7 +256,7 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
     color: palette.muted,
     fontSize: 11,
     fontWeight: '800',
-    textTransform: 'uppercase',
+    textTransform: 'uppercase', 
   },
   servingStepper: {
     height: 36,
@@ -297,12 +297,12 @@ const createStyles = (palette: AppPalette) => StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     fontWeight: '900',
-    marginTop: 6,
+    marginTop: -2,
   },
   ingredientRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: 8,
   },
   ingredientCheckButton: {
     width: 26,
